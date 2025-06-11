@@ -28,7 +28,6 @@ const PGFormFields: React.FC<PGFormFieldsProps> = ({
       <PGFormImageGallery 
         images={images} 
         setImages={setImages}
-        isEdit={isEdit}
       />
     </div>
   );
