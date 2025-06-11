@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, UserRole } from '@/types';
@@ -34,7 +35,7 @@ const DEMO_USERS = [
     id: 'demo-admin-1',
     name: 'Admin User',
     email: 'admin@restay.com',
-    role: 'admin',
+    role: 'admin' as UserRole,
     password: 'password',
     status: 'active',
     lastLogin: new Date().toISOString(),
@@ -44,7 +45,7 @@ const DEMO_USERS = [
     id: 'demo-manager-1', 
     name: 'Manager User',
     email: 'manager@restay.com',
-    role: 'manager',
+    role: 'manager' as UserRole,
     password: 'password',
     status: 'active',
     lastLogin: new Date().toISOString(),
@@ -54,7 +55,7 @@ const DEMO_USERS = [
     id: 'demo-accountant-1',
     name: 'Accountant User',
     email: 'accountant@restay.com',
-    role: 'accountant',
+    role: 'accountant' as UserRole,
     password: 'password',
     status: 'active',
     lastLogin: new Date().toISOString(),
@@ -68,7 +69,7 @@ const convertDbUserToUser = (dbUser: any): User => {
     id: dbUser.id,
     name: dbUser.name,
     email: dbUser.email,
-    role: dbUser.role,
+    role: dbUser.role as UserRole,
     status: dbUser.status || 'active',
     lastLogin: dbUser.lastLogin || 'Never',
     assignedPGs: ensureStringArray(dbUser.assignedPGs)
@@ -257,34 +258,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       });
 
-      if (authError) {
+      if (authError && !authError.message.includes('already registered')) {
         console.error('AuthContext: Auth user creation error:', authError);
         throw authError;
       }
 
-      if (authData.user) {
-        // Create the user profile in the users table
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .insert([{
-            id: authData.user.id,
-            name,
-            email,
-            role,
-            status: 'active',
-            lastLogin: 'Never',
-            assignedPGs: finalAssignedPGs
-          }])
-          .select()
-          .single();
+      const userId = authData.user?.id || `user_${Date.now()}`;
 
-        if (userError) {
-          console.error('AuthContext: User profile creation error:', userError);
-          throw userError;
-        }
+      // Create the user profile in the users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .insert([{
+          id: userId,
+          name,
+          email,
+          role,
+          status: 'active',
+          lastLogin: 'Never',
+          assignedPGs: finalAssignedPGs
+        }])
+        .select()
+        .single();
 
-        console.log('AuthContext: User created successfully:', userData);
+      if (userError) {
+        console.error('AuthContext: User profile creation error:', userError);
+        throw userError;
       }
+
+      console.log('AuthContext: User created successfully:', userData);
     } catch (error) {
       console.error('AuthContext: Error creating user:', error);
       throw error;
@@ -363,7 +364,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         id: u.id,
         name: u.name,
         email: u.email,
-        role: u.role as UserRole,
+        role: u.role,
         status: u.status,
         lastLogin: u.lastLogin,
         assignedPGs: u.assignedPGs

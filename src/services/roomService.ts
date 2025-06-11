@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { RoomStatus } from '@/types';
 
 export interface RoomData {
   id?: string;
@@ -8,7 +9,7 @@ export interface RoomData {
   room_type: string;
   capacity: number;
   rent: number;
-  status: string;
+  status: RoomStatus;
   occupant_name?: string;
   occupant_contact?: string;
 }
@@ -48,7 +49,7 @@ export const fetchRooms = async (pgId?: string) => {
 
 export const addRoom = async (roomData: RoomData) => {
   try {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('rooms')
       .insert([{
         pg_id: roomData.pg_id,
@@ -92,7 +93,7 @@ export const updateRoom = async (roomData: RoomData) => {
       throw new Error(`Invalid room ID format: ${roomData.id}. Expected UUID format.`);
     }
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('rooms')
       .update({
         pg_id: roomData.pg_id,
@@ -122,7 +123,7 @@ export const updateRoom = async (roomData: RoomData) => {
 
 export const deleteRoom = async (id: string) => {
   try {
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('rooms')
       .delete()
       .eq('id', id);
@@ -141,7 +142,7 @@ export const deleteRoom = async (id: string) => {
 
 export const updateRoomCapacityBulk = async (pgId: string, roomType: string, newCapacity: number) => {
   try {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('rooms')
       .update({ capacity: newCapacity })
       .eq('pg_id', pgId)
@@ -161,6 +162,6 @@ export const updateRoomCapacityBulk = async (pgId: string, roomType: string, new
   }
 };
 
-export const getRoomStatus = (room: RoomData) => {
+export const getRoomStatus = (room: RoomData): RoomStatus => {
   return room.status || 'available';
 };
