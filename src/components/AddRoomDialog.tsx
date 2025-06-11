@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { useMediaQuery } from '@/hooks/use-mobile';
 import { AlertCircle } from 'lucide-react';
+import { RoomStatus } from '@/types';
 
 interface AddRoomDialogProps {
   isOpen: boolean;
@@ -39,7 +40,7 @@ const AddRoomDialog: React.FC<AddRoomDialogProps> = ({
   const [type, setType] = useState('');
   const [capacity, setCapacity] = useState(1);
   const [rent, setRent] = useState(0);
-  const [status, setStatus] = useState<"vacant" | "partial" | "full" | "maintenance">("vacant");
+  const [status, setStatus] = useState<RoomStatus>("vacant");
   const [pgId, setPgId] = useState(initialPgId || '');
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [pgs, setPgs] = useState([]);
@@ -304,7 +305,7 @@ const AddRoomDialog: React.FC<AddRoomDialogProps> = ({
         <Label htmlFor="status" className="text-right">
           Status
         </Label>
-        <Select value={status} onValueChange={(value) => setStatus(value as "vacant" | "partial" | "full" | "maintenance")} >
+        <Select value={status} onValueChange={(value) => setStatus(value as RoomStatus)} >
           <SelectTrigger className="col-span-3">
             <SelectValue placeholder="Select status" />
           </SelectTrigger>

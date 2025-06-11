@@ -12,12 +12,14 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) => {
   const getStatusColor = () => {
     switch (status) {
       case 'vacant':
+      case 'available':
       case 'Paid':
         return 'bg-green-500 text-white';
       case 'partial':
       case 'Partial':
         return 'bg-amber-500 text-white';
       case 'full':
+      case 'occupied':
       case 'maintenance':
       case 'Unpaid':
         return 'bg-red-500 text-white';

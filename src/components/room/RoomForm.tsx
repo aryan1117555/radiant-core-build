@@ -47,9 +47,10 @@ const RoomForm: React.FC<RoomFormProps> = ({
       capacity: room?.capacity || 1,
       rent: room?.rent || 0,
       pgId: room?.pgId || '',
-      status: (room?.status === 'vacant' || room?.status === 'partial' || room?.status === 'full') 
-        ? 'available' 
-        : (room?.status || 'available')
+      status: room?.status === 'vacant' ? 'available' : 
+              room?.status === 'partial' ? 'occupied' : 
+              room?.status === 'full' ? 'occupied' : 
+              (room?.status || 'available')
     }
   });
 
@@ -62,9 +63,10 @@ const RoomForm: React.FC<RoomFormProps> = ({
         capacity: room.capacity,
         rent: room.rent,
         pgId: room.pgId,
-        status: (room.status === 'vacant' || room.status === 'partial' || room.status === 'full') 
-          ? 'available' 
-          : (room.status || 'available')
+        status: room.status === 'vacant' ? 'available' : 
+                room.status === 'partial' ? 'occupied' : 
+                room.status === 'full' ? 'occupied' : 
+                (room.status || 'available')
       });
     }
   }, [room, form]);

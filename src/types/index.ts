@@ -1,6 +1,6 @@
 
 export type PaymentMode = 'Cash' | 'UPI' | 'Bank Transfer';
-export type RoomStatus = 'available' | 'occupied' | 'maintenance';
+export type RoomStatus = 'available' | 'occupied' | 'maintenance' | 'vacant' | 'partial' | 'full';
 export type PaymentStatus = 'Paid' | 'Partial' | 'Unpaid';
 export type PGType = 'male' | 'female' | 'unisex';
 
