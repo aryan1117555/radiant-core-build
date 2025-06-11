@@ -86,9 +86,10 @@ const PGForm: React.FC<PGFormProps> = ({ open, onClose, onSave, pg }) => {
           {!isEdit && (
             <PGFormRoomAllocation
               roomTypes={roomTypes}
-              setRoomTypes={setRoomTypes}
-              roomAllocations={roomAllocations}
-              setRoomAllocations={setRoomAllocations}
+              floors={form.watch('floors') || 1}
+              totalRooms={form.watch('totalRooms') || 1}
+              allocations={roomAllocations}
+              setAllocations={setRoomAllocations}
             />
           )}
 
