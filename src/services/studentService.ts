@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Student, Payment } from '@/types';
 
@@ -136,15 +135,15 @@ export const addStudent = async (studentData: Omit<Student, 'id' | 'payments'>):
   }
 };
 
-export const removeStudent = async (id: string): Promise<boolean> => {
+export const removeStudent = async (studentId: string, roomId?: string): Promise<boolean> => {
   try {
-    console.log('Removing student with ID:', id);
+    console.log('Removing student with ID:', studentId, 'from room:', roomId);
     
     // First delete all payments for this student
     const { error: paymentsError } = await supabase
       .from('payments')
       .delete()
-      .eq('student_id', id);
+      .eq('student_id', studentId);
 
     if (paymentsError) {
       console.error('Error deleting student payments:', paymentsError);
@@ -155,7 +154,7 @@ export const removeStudent = async (id: string): Promise<boolean> => {
     const { error } = await supabase
       .from('students')
       .delete()
-      .eq('id', id);
+      .eq('id', studentId);
 
     if (error) {
       console.error('Error removing student:', error);
