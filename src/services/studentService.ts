@@ -170,6 +170,74 @@ export const removeStudent = async (id: string): Promise<boolean> => {
   }
 };
 
+export const deleteStudent = async (id: string): Promise<boolean> => {
+  try {
+    console.log('Deleting student with ID:', id);
+    
+    // First delete all payments for this student
+    const { error: paymentsError } = await supabase
+      .from('payments')
+      .delete()
+      .eq('student_id', id);
+
+    if (paymentsError) {
+      console.error('Error deleting student payments:', paymentsError);
+      throw paymentsError;
+    }
+
+    // Then delete the student
+    const { error } = await supabase
+      .from('students')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting student:', error);
+      throw error;
+    }
+
+    console.log('Student deleted successfully');
+    return true;
+  } catch (error) {
+    console.error('Error in deleteStudent:', error);
+    throw error;
+  }
+};
+
+export const clearAllStudentData = async (): Promise<boolean> => {
+  try {
+    console.log('Clearing all student data...');
+    
+    // First delete all payments
+    const { error: paymentsError } = await supabase
+      .from('payments')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+
+    if (paymentsError) {
+      console.error('Error clearing payments:', paymentsError);
+      throw paymentsError;
+    }
+
+    // Then delete all students
+    const { error: studentsError } = await supabase
+      .from('students')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+
+    if (studentsError) {
+      console.error('Error clearing students:', studentsError);
+      throw studentsError;
+    }
+
+    console.log('All student data cleared successfully');
+    return true;
+  } catch (error) {
+    console.error('Error in clearAllStudentData:', error);
+    throw error;
+  }
+};
+
 export const addPayment = async (paymentData: Omit<Payment, 'id'>): Promise<Payment> => {
   try {
     console.log('Adding payment:', paymentData);
@@ -211,6 +279,73 @@ export const addPayment = async (paymentData: Omit<Payment, 'id'>): Promise<Paym
   } catch (error) {
     console.error('Error in addPayment:', error);
     throw error;
+  }
+};
+
+export const updatePaymentApproval = async (paymentId: string, status: 'approved' | 'rejected', userId: string): Promise<boolean> => {
+  try {
+    console.log('Updating payment approval:', paymentId, status, userId);
+    
+    const { error } = await supabase
+      .from('payments')
+      .update({
+        approval_status: status,
+        approved_by: userId,
+        approved_at: new Date().toISOString()
+      })
+      .eq('id', paymentId);
+
+    if (error) {
+      console.error('Error updating payment approval:', error);
+      throw error;
+    }
+
+    console.log('Payment approval updated successfully');
+    return true;
+  } catch (error) {
+    console.error('Error in updatePaymentApproval:', error);
+    throw error;
+  }
+};
+
+export const getPendingPayments = async (): Promise<any[]> => {
+  try {
+    console.log('Fetching pending payments...');
+    
+    const { data, error } = await supabase
+      .from('payments')
+      .select(`
+        *,
+        students (
+          name,
+          pgs (name)
+        )
+      `)
+      .eq('approval_status', 'pending');
+
+    if (error) {
+      console.error('Error fetching pending payments:', error);
+      throw error;
+    }
+
+    // Transform the data
+    const pendingPayments = data.map(payment => ({
+      id: payment.id,
+      studentId: payment.student_id,
+      studentName: payment.students?.name || 'Unknown',
+      pgName: payment.students?.pgs?.name || 'Unknown PG',
+      amount: payment.amount,
+      date: new Date(payment.date),
+      mode: payment.mode,
+      note: payment.note,
+      approvalStatus: payment.approval_status
+    }));
+
+    console.log('Fetched pending payments:', pendingPayments.length);
+    return pendingPayments;
+  } catch (error) {
+    console.error('Error in getPendingPayments:', error);
+    return [];
   }
 };
 
