@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/types';
@@ -83,8 +84,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Check for existing session
     const checkUser = async () => {
       try {
+        console.log('AuthContext: Checking existing session...');
+        
+        // First check if user is in localStorage (demo mode)
+        const savedUser = localStorage.getItem('currentUser');
+        if (savedUser) {
+          const userData = JSON.parse(savedUser);
+          console.log('AuthContext: Found saved user in localStorage:', userData);
+          setUser(userData);
+          setIsLoading(false);
+          return;
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
+          console.log('AuthContext: Found Supabase session');
           // Get user profile from users table
           const { data: userData, error } = await supabase
             .from('users')
@@ -93,11 +107,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             .single();
 
           if (userData && !error) {
-            setUser(convertDbUserToUser(userData));
+            const convertedUser = convertDbUserToUser(userData);
+            console.log('AuthContext: Setting user from database:', convertedUser);
+            setUser(convertedUser);
+            localStorage.setItem('currentUser', JSON.stringify(convertedUser));
           }
+        } else {
+          console.log('AuthContext: No existing session found');
         }
       } catch (error) {
-        console.error('Error checking user session:', error);
+        console.error('AuthContext: Error checking user session:', error);
       } finally {
         setIsLoading(false);
       }
@@ -107,6 +126,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('AuthContext: Auth state changed:', event);
+      
       if (event === 'SIGNED_IN' && session?.user) {
         // Get user profile from users table
         const { data: userData, error } = await supabase
@@ -116,10 +137,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .single();
 
         if (userData && !error) {
-          setUser(convertDbUserToUser(userData));
+          const convertedUser = convertDbUserToUser(userData);
+          setUser(convertedUser);
+          localStorage.setItem('currentUser', JSON.stringify(convertedUser));
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
+        localStorage.removeItem('currentUser');
       }
     });
 
@@ -129,14 +153,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      console.log('Attempting login for:', email);
+      console.log('AuthContext: Attempting login for:', email);
 
       // First try demo users
       const demoUser = DEMO_USERS.find(u => u.email === email && u.password === password);
       if (demoUser) {
-        console.log('Demo user login successful');
+        console.log('AuthContext: Demo user login successful');
         const { password: _, ...userWithoutPassword } = demoUser;
-        setUser(userWithoutPassword as User);
+        const userData = userWithoutPassword as User;
+        setUser(userData);
+        localStorage.setItem('currentUser', JSON.stringify(userData));
         setIsLoading(false);
         return;
       }
@@ -158,8 +184,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (error) {
           // If email not confirmed, we can still log them in using our users table
           if (error.message.includes('Email not confirmed')) {
-            console.log('Email not confirmed, logging in with stored user data');
-            setUser(convertDbUserToUser(existingUser));
+            console.log('AuthContext: Email not confirmed, logging in with stored user data');
+            const convertedUser = convertDbUserToUser(existingUser);
+            setUser(convertedUser);
+            localStorage.setItem('currentUser', JSON.stringify(convertedUser));
             
             // Update last login time
             await supabase
@@ -170,13 +198,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setIsLoading(false);
             return;
           }
-          console.error('Supabase login error:', error);
+          console.error('AuthContext: Supabase login error:', error);
           throw error;
         }
 
         if (data.user) {
-          console.log('Supabase user login successful:', existingUser);
-          setUser(convertDbUserToUser(existingUser));
+          console.log('AuthContext: Supabase user login successful');
+          const convertedUser = convertDbUserToUser(existingUser);
+          setUser(convertedUser);
+          localStorage.setItem('currentUser', JSON.stringify(convertedUser));
 
           // Update last login time
           await supabase
@@ -189,7 +219,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('Invalid email or password');
       }
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('AuthContext: Login error:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -198,21 +228,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
+      console.log('AuthContext: Logging out user');
       await supabase.auth.signOut();
       setUser(null);
+      localStorage.removeItem('currentUser');
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('AuthContext: Logout error:', error);
     }
   };
 
   const createUser = async (email: string, password: string, name: string, role: string, assignedPGs: string[] = []): Promise<void> => {
     try {
-      console.log('Creating user:', { email, name, role, assignedPGs });
+      console.log('AuthContext: Creating user:', { email, name, role, assignedPGs });
 
       // For admin role, don't assign specific PGs as they have access to all
       const finalAssignedPGs = role === 'admin' ? [] : assignedPGs;
 
-      // Create Supabase auth user first, but don't require email confirmation
+      // Create Supabase auth user first
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -227,7 +259,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
 
       if (authError) {
-        console.error('Auth user creation error:', authError);
+        console.error('AuthContext: Auth user creation error:', authError);
         throw authError;
       }
 
@@ -248,14 +280,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .single();
 
         if (userError) {
-          console.error('User profile creation error:', userError);
+          console.error('AuthContext: User profile creation error:', userError);
           throw userError;
         }
 
-        console.log('User created successfully:', userData);
+        console.log('AuthContext: User created successfully:', userData);
       }
     } catch (error) {
-      console.error('Error creating user:', error);
+      console.error('AuthContext: Error creating user:', error);
       throw error;
     }
   };
@@ -276,16 +308,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .single();
 
       if (error) {
-        console.error('Error updating user:', error);
+        console.error('AuthContext: Error updating user:', error);
         throw error;
       }
 
       // Update current user if it's the same user
       if (user && user.id === userData.id) {
-        setUser(convertDbUserToUser(data));
+        const updatedUser = convertDbUserToUser(data);
+        setUser(updatedUser);
+        localStorage.setItem('currentUser', JSON.stringify(updatedUser));
       }
     } catch (error) {
-      console.error('Error updating user:', error);
+      console.error('AuthContext: Error updating user:', error);
       throw error;
     }
   };
@@ -299,13 +333,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .eq('id', id);
 
       if (userError) {
-        console.error('Error deleting user profile:', userError);
+        console.error('AuthContext: Error deleting user profile:', userError);
         throw userError;
       }
 
-      console.log('User deleted successfully');
+      console.log('AuthContext: User deleted successfully');
     } catch (error) {
-      console.error('Error deleting user:', error);
+      console.error('AuthContext: Error deleting user:', error);
       throw error;
     }
   };
@@ -318,15 +352,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .order('name', { ascending: true });
 
       if (error) {
-        console.error('Error fetching users:', error);
+        console.error('AuthContext: Error fetching users:', error);
         throw error;
       }
 
-      console.log('Fetched users from database:', data);
+      console.log('AuthContext: Fetched users from database:', data);
       const convertedUsers = (data || []).map(convertDbUserToUser);
-      return convertedUsers;
+      
+      // Add demo users to the list for admin view
+      const demoUsersConverted = DEMO_USERS.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        status: u.status,
+        lastLogin: u.lastLogin,
+        assignedPGs: u.assignedPGs
+      }));
+      
+      return [...convertedUsers, ...demoUsersConverted];
     } catch (error) {
-      console.error('Error in getUsers:', error);
+      console.error('AuthContext: Error in getUsers:', error);
       throw error;
     }
   };

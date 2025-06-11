@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/context/AuthContext';
-import { User as LucideUser, Trash2 } from 'lucide-react';
+import { User as LucideUser, Trash2, EyeIcon, EyeOffIcon } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -30,6 +31,7 @@ const UserManagement = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
   
   // Only allow admins to access this page
@@ -70,8 +72,9 @@ const UserManagement = () => {
   }, [isAdmin]);
 
   const onSubmit = async (data: UserFormValues) => {
-    console.log("Submitting form data:", data);
+    console.log("Creating user with data:", data);
     setIsCreating(true);
+    
     try {
       await createUser(data.email, data.password, data.name, data.role);
       form.reset();
@@ -148,11 +151,11 @@ const UserManagement = () => {
                 <LucideUser className="mr-2 h-4 w-4" /> Add User
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle>Add New User</DialogTitle>
                 <DialogDescription>
-                  Create a new user with specific role and permissions. They will be able to log in immediately after creation.
+                  Create a new user with specific role and permissions.
                 </DialogDescription>
               </DialogHeader>
               
@@ -165,7 +168,7 @@ const UserManagement = () => {
                       <FormItem>
                         <FormLabel>Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="John Doe" {...field} />
+                          <Input placeholder="Enter full name" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -179,7 +182,7 @@ const UserManagement = () => {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input placeholder="user@example.com" {...field} />
+                          <Input placeholder="Enter email address" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -193,7 +196,27 @@ const UserManagement = () => {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
+                          <div className="relative">
+                            <Input 
+                              type={showPassword ? "text" : "password"} 
+                              placeholder="Enter password" 
+                              {...field} 
+                              className="pr-10"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-0 top-0 h-full px-3"
+                            >
+                              {showPassword ? (
+                                <EyeOffIcon className="h-4 w-4" />
+                              ) : (
+                                <EyeIcon className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
