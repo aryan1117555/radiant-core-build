@@ -360,11 +360,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const convertedUsers = (data || []).map(convertDbUserToUser);
       
       // Add demo users to the list for admin view
-      const demoUsersConverted = DEMO_USERS.map(u => ({
+      const demoUsersConverted: User[] = DEMO_USERS.map(u => ({
         id: u.id,
         name: u.name,
         email: u.email,
-        role: u.role,
+        role: u.role as UserRole,
         status: u.status,
         lastLogin: u.lastLogin,
         assignedPGs: u.assignedPGs

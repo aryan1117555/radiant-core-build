@@ -1,5 +1,6 @@
+
 export type PaymentMode = 'Cash' | 'UPI' | 'Bank Transfer';
-export type RoomStatus = 'vacant' | 'partial' | 'full' | 'maintenance';
+export type RoomStatus = 'available' | 'occupied' | 'maintenance';
 export type PaymentStatus = 'Paid' | 'Partial' | 'Unpaid';
 export type PGType = 'male' | 'female' | 'unisex';
 
@@ -58,7 +59,8 @@ export interface Room {
   id: string;
   number: string;
   capacity: number;
-  students: Student[];
+  students?: Student[];
+  occupants?: Student[];
   pgId?: string;
   floor?: number;
   type?: string;
