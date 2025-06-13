@@ -272,7 +272,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           id: userId,
           name,
           email,
-          role,
+          role: role as any,
           status: 'active',
           lastLogin: 'Never',
           assignedPGs: finalAssignedPGs
@@ -299,7 +299,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .update({
           name: userData.name,
           email: userData.email,
-          role: userData.role,
+          role: userData.role as any,
           status: userData.status,
           assignedPGs: userData.assignedPGs
         })

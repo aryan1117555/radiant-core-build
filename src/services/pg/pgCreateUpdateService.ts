@@ -12,7 +12,7 @@ export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
       name: pgData.name,
       address: pgData.location, // Map location to address
       description: pgData.contactInfo || '',
-      pg_type: ensurePGType(pgData.type),
+      pg_type: ensurePGType(pgData.type) as any,
       total_rooms: pgData.totalRooms || 0,
       occupied_rooms: 0, // New PG starts with 0 occupied rooms
       revenue: pgData.revenue || 0,
@@ -34,6 +34,10 @@ export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
       console.error('Error creating PG in database:', error);
       logError('Error creating PG:', error);
       throw error;
+    }
+
+    if (!data) {
+      throw new Error('No data returned from PG creation');
     }
 
     console.log('PG created successfully in database:', data);
@@ -83,7 +87,7 @@ export const updatePG = async (id: string, pgData: PG): Promise<PG> => {
       name: pgData.name,
       address: pgData.location,
       description: pgData.contactInfo || '',
-      pg_type: ensurePGType(pgData.type),
+      pg_type: ensurePGType(pgData.type) as any,
       total_rooms: pgData.totalRooms || 0,
       revenue: pgData.revenue || 0,
       monthly_rent: pgData.monthlyRent || 0,
@@ -105,6 +109,10 @@ export const updatePG = async (id: string, pgData: PG): Promise<PG> => {
       console.error('Error updating PG in database:', error);
       logError('Error updating PG:', error);
       throw error;
+    }
+
+    if (!data) {
+      throw new Error('No data returned from PG update');
     }
 
     console.log('PG updated successfully in database:', data);
@@ -154,7 +162,7 @@ const createRoomsFromAllocations = async (pgId: string, allocations: any[]) => {
           room_type: roomType.name,
           capacity: roomType.capacity,
           rent: roomType.price,
-          status: 'available'
+          status: 'available' as any
         });
       }
     }
