@@ -30,8 +30,8 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router>
-          <DataProvider>
+        <DataProvider>
+          <Router>
             <div className="min-h-screen bg-background w-full">
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
@@ -151,8 +151,8 @@ function App() {
               </Routes>
               <Toaster />
             </div>
-          </DataProvider>
-        </Router>
+          </Router>
+        </DataProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
