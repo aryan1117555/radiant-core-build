@@ -12,7 +12,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { EyeIcon, EyeOffIcon, UserIcon, AlertCircleIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { supabase } from '@/integrations/supabase/client';
 
 const loginFormSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -76,61 +75,13 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  // Create demo user if they don't exist
-  const createDemoUserIfNeeded = async (email: string, password: string) => {
-    try {
-      console.log('Creating demo user if needed:', email);
-      
-      // First try to sign in - if it works, user exists
-      try {
-        await signIn(email, password);
-        console.log('Demo user already exists and login successful');
-        return;
-      } catch (loginError: any) {
-        console.log('Login failed, will try to create user:', loginError.message);
-        
-        // Only create user if login failed due to invalid credentials
-        if (loginError.message?.includes('Invalid login credentials')) {
-          console.log('Creating demo user:', email);
-          
-          // Create user with admin privileges
-          const { data: userData, error: createError } = await supabase.auth.admin.createUser({
-            email,
-            password,
-            email_confirm: true,
-            user_metadata: { 
-              name: email.split('@')[0],
-              role: email.includes('admin') ? 'admin' : email.includes('manager') ? 'manager' : 'accountant'
-            }
-          });
-
-          if (createError) {
-            console.error('Error creating demo user:', createError);
-            throw createError;
-          }
-
-          console.log('Demo user created successfully:', userData.user?.email);
-          
-          // Now try to sign in again
-          await signIn(email, password);
-        } else {
-          // Re-throw the original login error if it's not about invalid credentials
-          throw loginError;
-        }
-      }
-    } catch (error) {
-      console.error('Error in createDemoUserIfNeeded:', error);
-      throw error;
-    }
-  };
-
   // Quick login function for demo users
-  const quickLogin = async (email: string, password: string) => {
+  const quickLogin = async (email: string, password: string = 'password') => {
     setIsSubmitting(true);
     setLoginError(null);
     
     try {
-      await createDemoUserIfNeeded(email, password);
+      await signIn(email, password);
       toast({
         title: "Login Successful",
         description: "Welcome to the dashboard"
@@ -264,16 +215,16 @@ const LoginPage: React.FC = () => {
                   variant="outline" 
                   size="sm" 
                   className="w-full text-xs"
-                  onClick={() => quickLogin('admin@restay.com', 'password')}
+                  onClick={() => quickLogin('nextarbrains@gmail.com')}
                   disabled={isSubmitting}
                 >
-                  Login as Admin
+                  Login as Nextar (Admin)
                 </Button>
                 <Button 
                   variant="outline" 
                   size="sm" 
                   className="w-full text-xs"
-                  onClick={() => quickLogin('manager@restay.com', 'password')}
+                  onClick={() => quickLogin('manager1@gmail.com')}
                   disabled={isSubmitting}
                 >
                   Login as Manager
@@ -282,12 +233,33 @@ const LoginPage: React.FC = () => {
                   variant="outline" 
                   size="sm" 
                   className="w-full text-xs"
-                  onClick={() => quickLogin('accountant@restay.com', 'password')}
+                  onClick={() => quickLogin('accountantmain@restay.com')}
                   disabled={isSubmitting}
                 >
                   Login as Accountant
                 </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full text-xs"
+                  onClick={() => quickLogin('nextarmain@gmail.com')}
+                  disabled={isSubmitting}
+                >
+                  Login as Pal Sunny (Manager)
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full text-xs"
+                  onClick={() => quickLogin('viewmain@restay.com')}
+                  disabled={isSubmitting}
+                >
+                  Login as Viewer
+                </Button>
               </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                All demo accounts use password: <strong>password</strong>
+              </p>
             </div>
           </CardFooter>
         </Card>
