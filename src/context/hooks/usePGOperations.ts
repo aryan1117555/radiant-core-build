@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 export const usePGOperations = (refreshAllData: () => Promise<void>) => {
   const { toast } = useToast();
 
-  const handleAddPG = async (pg: Omit<PG, 'id'>): Promise<PG> => {
+  const addPG = async (pg: Omit<PG, 'id'>): Promise<PG> => {
     try {
       console.log("DataContext PGOps: Adding PG:", pg.name);
       
@@ -41,7 +41,13 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
       
       let errorMessage = 'Failed to create PG. Please try again.';
       if (error instanceof Error) {
-        errorMessage = error.message;
+        if (error.message.includes('foreign key constraint')) {
+          errorMessage = 'Selected manager is not available. Please choose a different manager.';
+        } else if (error.message.includes('duplicate')) {
+          errorMessage = 'A PG with this name already exists. Please choose a different name.';
+        } else {
+          errorMessage = error.message;
+        }
       }
       
       toast({
@@ -53,7 +59,7 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
     }
   };
 
-  const handleUpdatePG = async (pg: PG): Promise<PG> => {
+  const updatePG = async (pg: PG): Promise<PG> => {
     try {
       console.log("DataContext PGOps: Updating PG:", pg.name);
       
@@ -94,7 +100,7 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
     }
   };
 
-  const handleDeletePG = async (pgId: string) => {
+  const deletePG = async (pgId: string) => {
     try {
       console.log("DataContext PGOps: Deleting PG:", pgId);
       
@@ -126,8 +132,8 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
   };
 
   return {
-    addPG: handleAddPG,
-    updatePG: handleUpdatePG,
-    deletePG: handleDeletePG
+    addPG,
+    updatePG,
+    deletePG
   };
 };

@@ -8,6 +8,7 @@ import { useRoomOperations } from './hooks/useRoomOperations';
 import { useStudentOperations } from './hooks/useStudentOperations';
 import { usePaymentOperations } from './hooks/usePaymentOperations';
 import { getRoomStatus } from './utils/dataTransformUtils';
+import { useToast } from '@/hooks/use-toast';
 
 const DataContext = createContext<DataContextType | null>(null);
 
@@ -25,6 +26,7 @@ interface DataProviderProps {
 
 export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const { user } = useAuth();
+  const { toast } = useToast();
 
   console.log("DataContext: Current user:", user?.email, user?.role, user?.assignedPGs);
 
@@ -53,7 +55,14 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   useEffect(() => {
     if (user && user.id) {
       console.log("DataContext: User authenticated, loading data for:", user.email, user.role);
-      loadAllData();
+      loadAllData().catch(error => {
+        console.error("DataContext: Error loading data:", error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load data. Please refresh the page.',
+          variant: 'destructive'
+        });
+      });
     } else {
       console.log("DataContext: No authenticated user, clearing all data");
       setPgs([]);
@@ -61,7 +70,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       setStudents([]);
       setUsers([]);
     }
-  }, [user?.id, user?.role, loadAllData, setPgs, setRooms, setStudents, setUsers]);
+  }, [user?.id, user?.role, loadAllData, setPgs, setRooms, setStudents, setUsers, toast]);
 
   // Create the context value
   const value: DataContextType = {

@@ -7,6 +7,12 @@ export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
   console.log('Creating new PG with data:', pgData);
   
   try {
+    // Check if user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('User not authenticated');
+    }
+
     // Validate required fields
     if (!pgData.name?.trim()) {
       throw new Error('PG name is required');
@@ -100,6 +106,12 @@ export const updatePG = async (id: string, pgData: PG): Promise<PG> => {
   console.log('Updating PG with ID:', id, 'Data:', pgData);
   
   try {
+    // Check if user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('User not authenticated');
+    }
+
     // Validate required fields
     if (!pgData.name?.trim()) {
       throw new Error('PG name is required');

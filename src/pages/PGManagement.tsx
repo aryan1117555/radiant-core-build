@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 import { PG } from '@/types';
-import { useToast } from '@/hooks/use-toast';
 
 // Import our refactored components
 import PGPageHeader from '@/components/pg/management/PGPageHeader';
@@ -18,7 +17,6 @@ const PGManagement = () => {
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const { user } = useAuth();
-  const { toast } = useToast();
   
   // Use DataContext as the single source of truth
   const { 
@@ -62,32 +60,14 @@ const PGManagement = () => {
       console.log("PGManagement: onAddPG called with:", pg);
       
       // Use the addPG function from DataContext which returns the created PG
-      const newPG = await addPG(pg);
-      console.log("PGManagement: PG created successfully:", newPG);
+      await addPG(pg);
+      console.log("PGManagement: PG created successfully");
       
       setAddDialogOpen(false);
-      
-      toast({
-        title: 'Success',
-        description: `${pg.name} has been created successfully with ${pg.totalRooms} rooms.`
-      });
-      
       return true;
       
     } catch (error) {
       console.error("PGManagement: Error in onAddPG:", error);
-      
-      let errorMessage = 'Failed to create PG. Please try again.';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      });
-      
       return false;
     }
   };
@@ -101,7 +81,6 @@ const PGManagement = () => {
       
       setEditDialogOpen(false);
       setSelectedPG(null);
-      
       return true;
       
     } catch (error) {
@@ -112,19 +91,17 @@ const PGManagement = () => {
 
   const onDeletePG = async (pgId?: string): Promise<boolean> => {
     const targetPgId = pgId || selectedPG?.id;
-    const targetPg = pgId ? pgData.find(pg => pg.id === pgId) : selectedPG;
     
-    if (!targetPgId || !targetPg) return false;
+    if (!targetPgId) return false;
     
     try {
-      console.log("PGManagement: onDeletePG called for:", targetPg.name);
+      console.log("PGManagement: onDeletePG called for:", targetPgId);
       
       await deletePG(targetPgId);
       console.log("PGManagement: PG deleted successfully");
       
       setDeleteDialogOpen(false);
       setSelectedPG(null);
-      
       return true;
       
     } catch (error) {

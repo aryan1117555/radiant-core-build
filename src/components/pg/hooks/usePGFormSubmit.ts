@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { PG, RoomType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { updateRoomCapacityBulk } from '@/services/roomService';
 import { PGFormValues } from '@/components/pg/types';
 import { FloorAllocation } from '@/components/pg/PGFormRoomAllocation';
 
@@ -45,37 +44,20 @@ export const usePGFormSubmit = ({
       setIsSubmitting(true);
       console.log("usePGFormSubmit: Form submission started with values:", values);
 
-      // Enhanced validation with detailed error messages
-      const validationErrors: string[] = [];
-
+      // Basic validation
       if (!values.name?.trim()) {
-        validationErrors.push('PG name is required');
+        toast({
+          title: 'Validation Error',
+          description: 'PG name is required',
+          variant: 'destructive'
+        });
+        return;
       }
 
       if (!values.location?.trim()) {
-        validationErrors.push('Location is required');
-      }
-
-      if (!values.type || !['male', 'female', 'unisex'].includes(values.type)) {
-        validationErrors.push('Please select a valid PG type');
-      }
-
-      if (!values.totalRooms || values.totalRooms < 1) {
-        validationErrors.push('Total rooms must be at least 1');
-      }
-
-      if (!values.floors || values.floors < 1) {
-        validationErrors.push('Number of floors must be at least 1');
-      }
-
-      if (!values.totalBeds || values.totalBeds < 1) {
-        validationErrors.push('Total beds must be at least 1');
-      }
-
-      if (validationErrors.length > 0) {
         toast({
-          title: 'Validation Errors',
-          description: validationErrors.join(', '),
+          title: 'Validation Error',
+          description: 'Location is required',
           variant: 'destructive'
         });
         return;
@@ -84,17 +66,9 @@ export const usePGFormSubmit = ({
       let selectedManager = null;
       if (values.managerId && values.managerId !== 'none' && values.managerId !== '') {
         selectedManager = managers.find(m => m.id === values.managerId);
-        if (!selectedManager) {
-          console.warn("usePGFormSubmit: Selected manager not found in available managers");
-          toast({
-            title: 'Warning',
-            description: 'Selected manager is not available. Creating PG without manager assignment.',
-            variant: 'destructive'
-          });
-        }
       }
       
-      // Create the PG data object with proper structure for database insertion
+      // Create the PG data object
       let pgData: PG | Omit<PG, 'id'> = {
         name: values.name.trim(),
         type: values.type as 'male' | 'female' | 'unisex',
@@ -132,31 +106,6 @@ export const usePGFormSubmit = ({
       // For edit mode, include the ID
       if (isEdit && pg) {
         (pgData as PG).id = pg.id;
-        
-        // Update room capacities if changed
-        for (const currentRoomType of roomTypes) {
-          const originalRoomType = originalRoomTypes.find(rt => rt.id === currentRoomType.id);
-          
-          if (originalRoomType && originalRoomType.capacity !== currentRoomType.capacity) {
-            console.log(`Updating capacity for room type ${currentRoomType.name} from ${originalRoomType.capacity} to ${currentRoomType.capacity}`);
-            
-            try {
-              await updateRoomCapacityBulk(pg.id, currentRoomType.name, currentRoomType.capacity);
-              
-              toast({
-                title: 'Room Capacities Updated',
-                description: `All rooms of type ${currentRoomType.name} now have a capacity of ${currentRoomType.capacity}`
-              });
-            } catch (error) {
-              console.error('Error updating room capacities:', error);
-              toast({
-                title: 'Warning',
-                description: 'Room capacity updates may not have been fully applied to all rooms.',
-                variant: 'destructive'
-              });
-            }
-          }
-        }
       }
       
       console.log("usePGFormSubmit: Calling onSave with data:", pgData);
@@ -192,8 +141,6 @@ export const usePGFormSubmit = ({
           errorMessage = 'A PG with this name already exists. Please choose a different name.';
         } else if (error.message.includes('network') || error.message.includes('connection')) {
           errorMessage = 'Network error. Please check your connection and try again.';
-        } else if (error.message.includes('validation')) {
-          errorMessage = 'Please check all required fields and try again.';
         } else {
           errorMessage = error.message;
         }
