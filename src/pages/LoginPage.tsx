@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { EyeIcon, EyeOffIcon, UserIcon, AlertCircleIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { supabase } from '@/integrations/supabase/client';
 
 const loginFormSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -75,11 +76,69 @@ const LoginPage: React.FC = () => {
     }
   };
 
+  // Create demo user if they don't exist
+  const createDemoUserIfNeeded = async (email: string, password: string) => {
+    try {
+      console.log('Checking if demo user exists:', email);
+      
+      // Check if user exists in auth.users
+      const { data: { user: existingUser }, error: userError } = await supabase.auth.admin.getUserByEmail(email);
+      
+      if (!existingUser) {
+        console.log('Creating demo user:', email);
+        
+        // Create user with admin privileges
+        const { data: userData, error: createError } = await supabase.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { 
+            name: email.split('@')[0],
+            role: email.includes('admin') ? 'admin' : email.includes('manager') ? 'manager' : 'accountant'
+          }
+        });
+
+        if (createError) {
+          console.error('Error creating demo user:', createError);
+          throw createError;
+        }
+
+        console.log('Demo user created successfully:', userData.user?.email);
+        
+        // Now try to sign in
+        await signIn(email, password);
+      } else {
+        console.log('Demo user already exists, attempting login');
+        await signIn(email, password);
+      }
+    } catch (error) {
+      console.error('Error in createDemoUserIfNeeded:', error);
+      throw error;
+    }
+  };
+
   // Quick login function for demo users
-  const quickLogin = (email: string, password: string) => {
-    form.setValue('email', email);
-    form.setValue('password', password);
-    form.handleSubmit(onSubmit)();
+  const quickLogin = async (email: string, password: string) => {
+    setIsSubmitting(true);
+    setLoginError(null);
+    
+    try {
+      await createDemoUserIfNeeded(email, password);
+      toast({
+        title: "Login Successful",
+        description: "Welcome to the dashboard"
+      });
+    } catch (error: any) {
+      console.error('Quick login error:', error);
+      setLoginError(error.message || 'Quick login failed');
+      toast({
+        title: "Quick Login Failed",
+        description: error.message || 'Quick login failed',
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Show minimal loading for faster perceived performance

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -172,7 +171,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<void> => {
     console.log('AuthProvider: Attempting to sign in user:', email);
     
     try {
@@ -199,8 +198,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .update({ lastLogin: new Date().toISOString() })
           .eq('id', data.user.id);
       }
-      
-      return data;
     } catch (error) {
       console.error('AuthProvider: Sign in failed:', error);
       throw error;
