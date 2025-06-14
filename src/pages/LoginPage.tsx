@@ -15,7 +15,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const loginFormSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters')
+  password: z.string().min(1, 'Password is required')
 });
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
@@ -36,17 +36,34 @@ const LoginPage: React.FC = () => {
   });
 
   const onSubmit = async (data: LoginFormValues) => {
+    console.log('Login attempt with:', { email: data.email, passwordLength: data.password.length });
     setLoginError(null);
     setIsSubmitting(true);
     
     try {
       await signIn(data.email, data.password);
+      console.log('Login successful');
       toast({
         title: "Login Successful",
         description: "Welcome to the dashboard"
       });
     } catch (error: any) {
-      const errorMessage = error.message || "Invalid email or password. Please try again.";
+      console.error('Login error details:', error);
+      
+      let errorMessage = "Login failed. Please try again.";
+      
+      if (error.message) {
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = "Invalid email or password. Please check your credentials and try again.";
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = "Please confirm your email address before logging in.";
+        } else if (error.message.includes('Too many requests')) {
+          errorMessage = "Too many login attempts. Please wait a few minutes and try again.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       setLoginError(errorMessage);
       toast({
         title: "Authentication Failed",
@@ -56,6 +73,13 @@ const LoginPage: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Quick login function for demo users
+  const quickLogin = (email: string, password: string) => {
+    form.setValue('email', email);
+    form.setValue('password', password);
+    form.handleSubmit(onSubmit)();
   };
 
   // Show minimal loading for faster perceived performance
@@ -166,12 +190,38 @@ const LoginPage: React.FC = () => {
             </Form>
           </CardContent>
           
-          <CardFooter className="flex flex-col">
+          <CardFooter className="flex flex-col space-y-4">
             <div className="text-sm text-center text-muted-foreground">
-              <p className="mb-2">Demo Accounts:</p>
-              <p>Admin: admin@restay.com / password</p>
-              <p>Manager: manager@restay.com / password</p>
-              <p>Accountant: accountant@restay.com / password</p>
+              <p className="mb-3 font-medium">Quick Login (Demo Accounts):</p>
+              <div className="space-y-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full text-xs"
+                  onClick={() => quickLogin('admin@restay.com', 'password')}
+                  disabled={isSubmitting}
+                >
+                  Login as Admin
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full text-xs"
+                  onClick={() => quickLogin('manager@restay.com', 'password')}
+                  disabled={isSubmitting}
+                >
+                  Login as Manager
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full text-xs"
+                  onClick={() => quickLogin('accountant@restay.com', 'password')}
+                  disabled={isSubmitting}
+                >
+                  Login as Accountant
+                </Button>
+              </div>
             </div>
           </CardFooter>
         </Card>

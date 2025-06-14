@@ -120,6 +120,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           lastLogin: userData.lastLogin
         };
       } else {
+        console.log('AuthProvider: User not found in users table, creating entry...');
         // User doesn't exist in users table, create entry and use metadata
         const metadata = supabaseUser.user_metadata || {};
         const appMetadata = supabaseUser.app_metadata || {};
@@ -135,11 +136,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
 
         // Insert into users table
-        await supabase
+        const { data: insertedUser, error: insertError } = await supabase
           .from('users')
           .insert(newUserData)
           .select()
           .single();
+
+        if (insertError) {
+          console.error('AuthProvider: Error creating user entry:', insertError);
+        } else {
+          console.log('AuthProvider: User entry created successfully');
+        }
 
         return {
           ...supabaseUser,
@@ -166,25 +173,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signIn = async (email: string, password: string) => {
-    console.log('AuthProvider: Signing in user:', email);
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      console.error('AuthProvider: Sign in error:', error);
-      throw error;
-    }
-
-    console.log('AuthProvider: Sign in successful:', data.user?.email);
+    console.log('AuthProvider: Attempting to sign in user:', email);
     
-    // Update lastLogin in users table
-    if (data.user) {
-      await supabase
-        .from('users')
-        .update({ lastLogin: new Date().toISOString() })
-        .eq('id', data.user.id);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        console.error('AuthProvider: Sign in error:', {
+          message: error.message,
+          status: error.status,
+          name: error.name
+        });
+        throw error;
+      }
+
+      console.log('AuthProvider: Sign in successful for:', data.user?.email);
+      
+      // Update lastLogin in users table
+      if (data.user) {
+        await supabase
+          .from('users')
+          .update({ lastLogin: new Date().toISOString() })
+          .eq('id', data.user.id);
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('AuthProvider: Sign in failed:', error);
+      throw error;
     }
   };
 
