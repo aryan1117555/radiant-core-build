@@ -4,13 +4,16 @@ import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboardIcon, UsersIcon, CreditCardIcon, BarChart2Icon, SettingsIcon, LogOutIcon, BuildingIcon, DoorOpenIcon, UserIcon, DatabaseIcon, MenuIcon, ChevronLeftIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import { SessionService } from '@/services/sessionService';
 import { Button } from './ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useToast } from '@/hooks/use-toast';
 
 const AppSidebar = () => {
   const location = useLocation();
   const pathname = location.pathname;
   const { user, signOut } = useAuth();
+  const { toast } = useToast();
   const isMobile = useIsMobile();
   const [isCollapsed, setIsCollapsed] = useState(isMobile);
 
@@ -96,6 +99,35 @@ const AppSidebar = () => {
     }
   };
 
+  // Enhanced logout with session invalidation
+  const handleLogout = async () => {
+    try {
+      // Show toast immediately
+      toast({
+        title: "Logging Out",
+        description: "Please wait while we log you out..."
+      });
+
+      // Invalidate session first
+      await SessionService.invalidateSession();
+      
+      // Then sign out from auth
+      await signOut();
+
+      toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out from all devices."
+      });
+    } catch (error) {
+      console.error('Error during logout:', error);
+      toast({
+        title: "Logout Error",
+        description: "There was an issue logging out. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <aside className={cn("h-screen fixed left-0 top-0 z-40 bg-sidebar flex flex-col transition-all duration-300 ease-in-out", isCollapsed ? "w-[70px]" : "w-[280px]")}>
       <div className="flex justify-between items-center h-16 px-3">
@@ -146,7 +178,7 @@ const AppSidebar = () => {
                 </p>
               </div>
             )}
-            <Button variant="ghost" size="icon" onClick={signOut} className={cn("h-8 w-8 text-white hover:bg-white/10", isCollapsed && "ml-0")} title="Logout">
+            <Button variant="ghost" size="icon" onClick={handleLogout} className={cn("h-8 w-8 text-white hover:bg-white/10", isCollapsed && "ml-0")} title="Logout">
               <LogOutIcon className="h-4 w-4" />
             </Button>
           </div>

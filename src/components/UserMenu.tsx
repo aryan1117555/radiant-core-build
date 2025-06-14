@@ -3,6 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/context/AuthContext';
+import { SessionService } from '@/services/sessionService';
 import { LogOutIcon, SettingsIcon, UserIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
@@ -13,14 +14,31 @@ const UserMenu: React.FC = () => {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    // Show toast immediately
-    toast({
-      title: "Logged Out",
-      description: "You have been successfully logged out."
-    });
+    try {
+      // Show toast immediately
+      toast({
+        title: "Logging Out",
+        description: "Please wait while we log you out..."
+      });
 
-    // Logout is now instant
-    await signOut();
+      // Invalidate session first
+      await SessionService.invalidateSession();
+      
+      // Then sign out from auth
+      await signOut();
+
+      toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out from all devices."
+      });
+    } catch (error) {
+      console.error('Error during logout:', error);
+      toast({
+        title: "Logout Error",
+        description: "There was an issue logging out. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleProfileClick = () => {
