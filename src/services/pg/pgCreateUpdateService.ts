@@ -72,7 +72,7 @@ export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
 
     // If room allocations are provided, create rooms
     if ((pgData as any).roomAllocations && Array.isArray((pgData as any).roomAllocations)) {
-      console.log('Creating rooms for new PG...');
+      console.log('Creating rooms for new PG with allocations:', (pgData as any).roomAllocations);
       try {
         await createRoomsFromAllocations(data.id, (pgData as any).roomAllocations);
       } catch (roomError) {
@@ -80,6 +80,8 @@ export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
         // Don't fail the entire operation if room creation fails
         console.warn('PG created but room creation failed. Rooms can be added manually.');
       }
+    } else {
+      console.log('No room allocations provided, skipping room creation');
     }
 
     // Transform the database result back to our PG type
@@ -200,36 +202,48 @@ export const updatePG = async (id: string, pgData: PG): Promise<PG> => {
 // Helper function to create rooms from allocations
 const createRoomsFromAllocations = async (pgId: string, allocations: any[]) => {
   try {
+    console.log('createRoomsFromAllocations called with:', { pgId, allocations });
+    
     const roomsToCreate = [];
 
     for (const allocation of allocations) {
-      const { floor, roomType, startNumber, endNumber } = allocation;
+      console.log('Processing allocation:', allocation);
       
-      for (let roomNum = startNumber; roomNum <= endNumber; roomNum++) {
+      const { floor, roomTypeId, roomTypeName, count, capacity } = allocation;
+      
+      // Generate room numbers for this allocation
+      for (let i = 1; i <= count; i++) {
+        const roomNumber = `${floor}${i.toString().padStart(2, '0')}`;
+        
         roomsToCreate.push({
           pg_id: pgId,
-          room_number: `${floor}${roomNum.toString().padStart(2, '0')}`,
-          room_type: roomType.name,
-          capacity: roomType.capacity,
-          rent: roomType.price,
+          room_number: roomNumber,
+          room_type: roomTypeName || roomTypeId || 'Standard',
+          capacity: capacity || 1,
+          rent: 0, // Default rent, can be updated later
           status: 'available'
         });
       }
     }
 
     if (roomsToCreate.length > 0) {
-      console.log(`Creating ${roomsToCreate.length} rooms for PG ${pgId}`);
+      console.log(`Creating ${roomsToCreate.length} rooms for PG ${pgId}:`, roomsToCreate);
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('rooms')
-        .insert(roomsToCreate);
+        .insert(roomsToCreate)
+        .select();
 
       if (error) {
         console.error('Error creating rooms:', error);
-        throw new Error('Failed to create rooms for the PG');
+        throw new Error(`Failed to create rooms for the PG: ${error.message}`);
       }
 
-      console.log('Rooms created successfully');
+      console.log('Rooms created successfully:', data);
+      return data;
+    } else {
+      console.log('No rooms to create');
+      return [];
     }
   } catch (error) {
     console.error('Error in createRoomsFromAllocations:', error);

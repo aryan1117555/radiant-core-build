@@ -44,6 +44,7 @@ export const usePGFormSubmit = ({
     try {
       setIsSubmitting(true);
       console.log("usePGFormSubmit: Form submission started with values:", values);
+      console.log("usePGFormSubmit: Room allocations:", roomAllocations);
 
       // Check authentication status first
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -112,10 +113,17 @@ export const usePGFormSubmit = ({
       
       console.log("usePGFormSubmit: Final PG data before save:", pgData);
       
-      // Add room allocations for new PGs
+      // Add room allocations for new PGs - ensure proper data structure
       if (!isEdit && roomAllocations.length > 0) {
-        (pgData as any).roomAllocations = roomAllocations;
-        console.log("usePGFormSubmit: Added room allocations to PG data");
+        console.log("usePGFormSubmit: Adding room allocations:", roomAllocations);
+        (pgData as any).roomAllocations = roomAllocations.map(allocation => ({
+          floor: allocation.floor,
+          roomTypeId: allocation.roomTypeId,
+          roomTypeName: allocation.roomTypeName,
+          count: allocation.count,
+          capacity: allocation.capacity
+        }));
+        console.log("usePGFormSubmit: Processed room allocations:", (pgData as any).roomAllocations);
       }
       
       // For edit mode, include the ID
