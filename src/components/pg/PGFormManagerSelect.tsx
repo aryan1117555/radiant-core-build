@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { User } from '@/types';
+import { User } from '@/context/AuthContext';
 import { UseFormReturn } from 'react-hook-form';
 import { PGFormValues } from './types';
 import { useAuth } from '@/context/AuthContext';

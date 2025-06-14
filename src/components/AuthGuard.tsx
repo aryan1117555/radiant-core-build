@@ -9,10 +9,10 @@ interface AuthGuardProps {
 }
 
 const AuthGuard: React.FC<AuthGuardProps> = ({ children, requiredRole }) => {
-  const { user, isLoading } = useAuth();
+  const { user, loading } = useAuth();
 
   // Minimal loading state for faster logout transitions
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-muted/40">
         <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary" />

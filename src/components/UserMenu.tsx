@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -5,15 +6,12 @@ import { useAuth } from '@/context/AuthContext';
 import { LogOutIcon, SettingsIcon, UserIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+
 const UserMenu: React.FC = () => {
-  const {
-    user,
-    logout
-  } = useAuth();
-  const {
-    toast
-  } = useToast();
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
+
   const handleLogout = async () => {
     // Show toast immediately
     toast({
@@ -22,18 +20,22 @@ const UserMenu: React.FC = () => {
     });
 
     // Logout is now instant
-    await logout();
+    await signOut();
   };
+
   const handleProfileClick = () => {
     navigate('/profile');
   };
+
   if (!user) return null;
-  return <DropdownMenu>
+
+  return (
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full">
           <div className="h-8 w-8 rounded-full bg-restay flex items-center justify-center text-white">
             <span className="text-xs font-medium">
-              {user.name.split(' ').map(n => n[0]).join('')}
+              {user.name?.split(' ').map(n => n[0]).join('') || 'A'}
             </span>
           </div>
         </Button>
@@ -41,7 +43,7 @@ const UserMenu: React.FC = () => {
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium">{user.name}</p>
+            <p className="text-sm font-medium">{user.name || 'Admin User'}</p>
             <p className="text-xs text-muted-foreground">{user.email}</p>
           </div>
         </DropdownMenuLabel>
@@ -57,6 +59,8 @@ const UserMenu: React.FC = () => {
           <span>Logout</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
-    </DropdownMenu>;
+    </DropdownMenu>
+  );
 };
+
 export default UserMenu;

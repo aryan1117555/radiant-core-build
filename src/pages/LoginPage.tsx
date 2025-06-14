@@ -21,7 +21,7 @@ const loginFormSchema = z.object({
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
 const LoginPage: React.FC = () => {
-  const { user, login, isLoading } = useAuth();
+  const { user, signIn, loading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,7 +40,7 @@ const LoginPage: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      await login(data.email, data.password);
+      await signIn(data.email, data.password);
       toast({
         title: "Login Successful",
         description: "Welcome to the dashboard"
@@ -59,7 +59,7 @@ const LoginPage: React.FC = () => {
   };
 
   // Show minimal loading for faster perceived performance
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/40">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600" />
