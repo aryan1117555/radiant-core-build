@@ -104,11 +104,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (!error && userData) {
         // User exists in users table, use that data
+        // Properly handle assignedPGs conversion from JSON to string array
+        const assignedPGs = Array.isArray(userData.assignedPGs) 
+          ? userData.assignedPGs 
+          : userData.assignedPGs 
+            ? JSON.parse(userData.assignedPGs as string) 
+            : [];
+
         return {
           ...supabaseUser,
           name: userData.name,
           role: userData.role,
-          assignedPGs: userData.assignedPGs || [],
+          assignedPGs: assignedPGs,
           status: userData.status,
           lastLogin: userData.lastLogin
         };
@@ -202,26 +209,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (error) throw error;
       
       // Transform database users to User interface
-      return (data || []).map(dbUser => ({
-        id: dbUser.id,
-        email: dbUser.email,
-        name: dbUser.name,
-        role: dbUser.role,
-        assignedPGs: Array.isArray(dbUser.assignedPGs) ? dbUser.assignedPGs : [],
-        status: dbUser.status,
-        lastLogin: dbUser.lastLogin,
-        // Add required Supabase User properties with defaults
-        aud: 'authenticated',
-        created_at: dbUser.created_at || new Date().toISOString(),
-        app_metadata: {},
-        user_metadata: {},
-        phone: '',
-        confirmation_sent_at: '',
-        email_confirmed_at: '',
-        confirmed_at: '',
-        last_sign_in_at: '',
-        updated_at: dbUser.updated_at || new Date().toISOString()
-      } as User));
+      return (data || []).map(dbUser => {
+        // Properly handle assignedPGs conversion from JSON to string array
+        const assignedPGs = Array.isArray(dbUser.assignedPGs) 
+          ? dbUser.assignedPGs 
+          : dbUser.assignedPGs 
+            ? JSON.parse(dbUser.assignedPGs as string) 
+            : [];
+
+        return {
+          id: dbUser.id,
+          email: dbUser.email,
+          name: dbUser.name,
+          role: dbUser.role,
+          assignedPGs: assignedPGs,
+          status: dbUser.status,
+          lastLogin: dbUser.lastLogin,
+          // Add required Supabase User properties with defaults
+          aud: 'authenticated',
+          created_at: dbUser.created_at || new Date().toISOString(),
+          app_metadata: {},
+          user_metadata: {},
+          phone: '',
+          confirmation_sent_at: '',
+          email_confirmed_at: '',
+          confirmed_at: '',
+          last_sign_in_at: '',
+          updated_at: dbUser.updated_at || new Date().toISOString()
+        } as User;
+      });
     } catch (error) {
       console.error('Error fetching users:', error);
       return [];
@@ -289,12 +305,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (error) throw error;
 
+      // Properly handle assignedPGs conversion from JSON to string array
+      const assignedPGs = Array.isArray(data.assignedPGs) 
+        ? data.assignedPGs 
+        : data.assignedPGs 
+          ? JSON.parse(data.assignedPGs as string) 
+          : [];
+
       return {
         id: data.id,
         email: data.email,
         name: data.name,
         role: data.role,
-        assignedPGs: data.assignedPGs,
+        assignedPGs: assignedPGs,
         status: data.status,
         lastLogin: data.lastLogin,
         // Add required Supabase User properties
