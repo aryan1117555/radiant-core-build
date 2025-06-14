@@ -9,7 +9,7 @@ export interface Session {
   created_at: string;
   updated_at: string;
   user_agent?: string;
-  ip_address?: string;
+  ip_address?: string | null;
   is_active: boolean;
 }
 
@@ -61,7 +61,10 @@ export class SessionService {
       this.setSessionCookie(sessionToken, expiresAt);
       
       console.log('Session created successfully:', data.id);
-      return data;
+      return {
+        ...data,
+        ip_address: data.ip_address as string | null
+      };
     } catch (error) {
       console.error('Error in createSession:', error);
       return null;
@@ -92,7 +95,10 @@ export class SessionService {
 
       // Extend session if it's valid
       await this.extendSession(data.id);
-      return data;
+      return {
+        ...data,
+        ip_address: data.ip_address as string | null
+      };
     } catch (error) {
       console.error('Error validating session:', error);
       this.clearSessionCookie();
@@ -157,7 +163,10 @@ export class SessionService {
         return [];
       }
 
-      return data || [];
+      return (data || []).map(session => ({
+        ...session,
+        ip_address: session.ip_address as string | null
+      }));
     } catch (error) {
       console.error('Error in getUserSessions:', error);
       return [];
