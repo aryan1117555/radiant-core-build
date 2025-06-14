@@ -181,18 +181,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (authError) throw authError;
 
-      // Create user in users table
+      // Create user in users table - insert single object, not array
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .insert([{
+        .insert({
           id: authData.user.id,
           email,
           name,
-          role,
+          role: role as "admin" | "manager" | "accountant" | "viewer",
           assignedPGs,
           status: 'active',
           lastLogin: 'Never'
-        }])
+        })
         .select()
         .single();
 
@@ -221,7 +221,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .update({
           name: userData.name,
           email: userData.email,
-          role: userData.role,
+          role: userData.role as "admin" | "manager" | "accountant" | "viewer",
           status: userData.status,
           assignedPGs: userData.assignedPGs
         })

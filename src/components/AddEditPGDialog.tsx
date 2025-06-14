@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { PG } from '@/types';
+import { User } from '@/context/AuthContext';
 import { usePGFormState } from '@/components/pg/hooks/usePGFormState';
 import { usePGFormSubmit } from '@/components/pg/hooks/usePGFormSubmit';
 import { usePGFormValidation } from '@/components/pg/hooks/usePGFormValidation';
@@ -80,7 +81,7 @@ const AddEditPGDialog: React.FC<AddEditPGDialogProps> = ({
           <form onSubmit={form.handleSubmit(onSubmit)} className="responsive-form pt-4" key={formKey}>
             <PGFormContent
               form={form}
-              managers={managers}
+              managers={managers as User[]}
               roomTypes={roomTypes}
               setRoomTypes={setRoomTypes}
               roomAllocations={roomAllocations}
