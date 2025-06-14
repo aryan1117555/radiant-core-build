@@ -9,23 +9,44 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
   const handleAddPG = async (pg: Omit<PG, 'id'>): Promise<PG> => {
     try {
       console.log("DataContext PGOps: Adding PG:", pg.name);
+      
+      // Validate required fields
+      if (!pg.name?.trim()) {
+        throw new Error('PG name is required');
+      }
+      if (!pg.location?.trim()) {
+        throw new Error('Location is required');
+      }
+      if (!pg.totalRooms || pg.totalRooms < 1) {
+        throw new Error('Total rooms must be at least 1');
+      }
+      if (!pg.floors || pg.floors < 1) {
+        throw new Error('Number of floors must be at least 1');
+      }
+
       const newPG = await addPGService(pg);
       console.log("DataContext PGOps: PG added successfully:", newPG);
       
-      // Refresh all data after successful creation
+      // Refresh all data after successful creation to update UI
       await refreshAllData();
       
       toast({
         title: 'Success',
-        description: `${pg.name} has been created successfully.`
+        description: `${pg.name} has been created successfully with ${pg.totalRooms} rooms.`
       });
       
       return newPG;
     } catch (error) {
       console.error("DataContext PGOps: Error adding PG:", error);
+      
+      let errorMessage = 'Failed to create PG. Please try again.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: 'Error',
-        description: `Failed to create ${pg.name}. Please try again.`,
+        description: errorMessage,
         variant: 'destructive'
       });
       throw error;
@@ -35,10 +56,19 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
   const handleUpdatePG = async (pg: PG): Promise<PG> => {
     try {
       console.log("DataContext PGOps: Updating PG:", pg.name);
+      
+      // Validate required fields
+      if (!pg.name?.trim()) {
+        throw new Error('PG name is required');
+      }
+      if (!pg.location?.trim()) {
+        throw new Error('Location is required');
+      }
+
       const updatedPG = await updatePGService(pg.id, pg);
       console.log("DataContext PGOps: PG updated successfully:", updatedPG);
       
-      // Refresh all data after successful update
+      // Refresh all data after successful update to update UI
       await refreshAllData();
       
       toast({
@@ -49,9 +79,15 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
       return updatedPG;
     } catch (error) {
       console.error("DataContext PGOps: Error updating PG:", error);
+      
+      let errorMessage = 'Failed to update PG. Please try again.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: 'Error',
-        description: `Failed to update ${pg.name}. Please try again.`,
+        description: errorMessage,
         variant: 'destructive'
       });
       throw error;
@@ -64,7 +100,7 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
       await deletePGService(pgId);
       console.log("DataContext PGOps: PG deleted successfully");
       
-      // Refresh all data after successful deletion
+      // Refresh all data after successful deletion to update UI
       await refreshAllData();
       
       toast({

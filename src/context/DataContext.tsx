@@ -27,7 +27,6 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const { user } = useAuth();
 
   console.log("DataContext: Current user:", user?.email, user?.role, user?.assignedPGs);
-  console.log("DataContext: Unified data connection for role:", user?.role);
 
   // Use the unified data loader hook
   const {
@@ -50,10 +49,10 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const studentOperations = useStudentOperations(user, students, refreshAllData, loadAllData);
   const paymentOperations = usePaymentOperations(user, refreshAllData);
 
-  // Load data when user changes - with proper dependency handling
+  // Load data when user changes
   useEffect(() => {
     if (user && user.id) {
-      console.log("DataContext: User authenticated, loading unified data for:", user.email, user.role);
+      console.log("DataContext: User authenticated, loading data for:", user.email, user.role);
       loadAllData();
     } else {
       console.log("DataContext: No authenticated user, clearing all data");
@@ -62,7 +61,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       setStudents([]);
       setUsers([]);
     }
-  }, [user?.id, user?.role]);
+  }, [user?.id, user?.role, loadAllData, setPgs, setRooms, setStudents, setUsers]);
 
   // Create the context value
   const value: DataContextType = {
@@ -79,7 +78,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     refreshAllData
   };
 
-  console.log("DataContext: Providing unified data - PGs:", pgs.length, "Rooms:", rooms.length, "Students:", students.length, "Users:", users.length);
+  console.log("DataContext: Providing data - PGs:", pgs.length, "Rooms:", rooms.length, "Students:", students.length, "Users:", users.length);
 
   return (
     <DataContext.Provider value={value}>

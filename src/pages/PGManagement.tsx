@@ -68,25 +68,6 @@ const PGManagement = () => {
       setIsProcessing(true);
       console.log("PGManagement: onAddPG called with:", pg);
       
-      // Validate required fields
-      if (!pg.name?.trim()) {
-        toast({
-          title: 'Validation Error',
-          description: 'PG name is required.',
-          variant: 'destructive'
-        });
-        return false;
-      }
-
-      if (!pg.location?.trim()) {
-        toast({
-          title: 'Validation Error',
-          description: 'Location is required.',
-          variant: 'destructive'
-        });
-        return false;
-      }
-
       const newPG = await addPG(pg);
       console.log("PGManagement: PG created successfully:", newPG);
       

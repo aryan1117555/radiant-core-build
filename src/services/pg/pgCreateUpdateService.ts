@@ -1,18 +1,29 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { PG, RoomType, ensureStringArray, ensureRoomTypeArray, ensurePGType } from '@/types';
+import { PG, ensureStringArray, ensurePGType } from '@/types';
 import { logError } from './pgUtils';
 
 export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
   console.log('Creating new PG with data:', pgData);
   
   try {
-    // Prepare the data for database insertion
+    // Validate required fields
+    if (!pgData.name?.trim()) {
+      throw new Error('PG name is required');
+    }
+    if (!pgData.location?.trim()) {
+      throw new Error('Location is required');
+    }
+    if (!pgData.totalRooms || pgData.totalRooms < 1) {
+      throw new Error('Total rooms must be at least 1');
+    }
+
+    // Prepare the data for database insertion with proper type casting
     const dbData = {
-      name: pgData.name,
-      address: pgData.location, // Map location to address
-      description: pgData.contactInfo || '',
-      pg_type: ensurePGType(pgData.type) as any,
+      name: pgData.name.trim(),
+      address: pgData.location.trim(),
+      description: pgData.contactInfo?.trim() || '',
+      pg_type: ensurePGType(pgData.type),
       total_rooms: pgData.totalRooms || 0,
       occupied_rooms: 0, // New PG starts with 0 occupied rooms
       revenue: pgData.revenue || 0,
@@ -33,7 +44,7 @@ export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
     if (error) {
       console.error('Error creating PG in database:', error);
       logError('Error creating PG:', error);
-      throw error;
+      throw new Error(`Failed to create PG: ${error.message}`);
     }
 
     if (!data) {
@@ -45,7 +56,13 @@ export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
     // If room allocations are provided, create rooms
     if ((pgData as any).roomAllocations && Array.isArray((pgData as any).roomAllocations)) {
       console.log('Creating rooms for new PG...');
-      await createRoomsFromAllocations(data.id, (pgData as any).roomAllocations);
+      try {
+        await createRoomsFromAllocations(data.id, (pgData as any).roomAllocations);
+      } catch (roomError) {
+        console.error('Error creating rooms:', roomError);
+        // Don't fail the entire operation if room creation fails
+        console.warn('PG created but room creation failed. Rooms can be added manually.');
+      }
     }
 
     // Transform the database result back to our PG type
@@ -82,12 +99,20 @@ export const updatePG = async (id: string, pgData: PG): Promise<PG> => {
   console.log('Updating PG with ID:', id, 'Data:', pgData);
   
   try {
-    // Prepare the data for database update
+    // Validate required fields
+    if (!pgData.name?.trim()) {
+      throw new Error('PG name is required');
+    }
+    if (!pgData.location?.trim()) {
+      throw new Error('Location is required');
+    }
+
+    // Prepare the data for database update with proper type casting
     const dbData = {
-      name: pgData.name,
-      address: pgData.location,
-      description: pgData.contactInfo || '',
-      pg_type: ensurePGType(pgData.type) as any,
+      name: pgData.name.trim(),
+      address: pgData.location.trim(),
+      description: pgData.contactInfo?.trim() || '',
+      pg_type: ensurePGType(pgData.type),
       total_rooms: pgData.totalRooms || 0,
       revenue: pgData.revenue || 0,
       monthly_rent: pgData.monthlyRent || 0,
@@ -108,7 +133,7 @@ export const updatePG = async (id: string, pgData: PG): Promise<PG> => {
     if (error) {
       console.error('Error updating PG in database:', error);
       logError('Error updating PG:', error);
-      throw error;
+      throw new Error(`Failed to update PG: ${error.message}`);
     }
 
     if (!data) {
@@ -162,7 +187,7 @@ const createRoomsFromAllocations = async (pgId: string, allocations: any[]) => {
           room_type: roomType.name,
           capacity: roomType.capacity,
           rent: roomType.price,
-          status: 'available' as any
+          status: 'available'
         });
       }
     }

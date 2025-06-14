@@ -37,7 +37,7 @@ export const useDataLoader = (user: any) => {
       // Load PGs first
       console.log("DataLoader: Loading PGs...");
       const pgsData = await fetchPGs();
-      console.log("DataLoader: Loaded PGs:", pgsData.length, pgsData.map(pg => ({ id: pg.id, name: pg.name })));
+      console.log("DataLoader: Loaded PGs:", pgsData.length);
       
       // Load rooms with PG information
       console.log("DataLoader: Loading rooms...");
@@ -64,11 +64,6 @@ export const useDataLoader = (user: any) => {
         console.log("DataLoader: Loaded students from database:", studentsData.length);
       }
       
-      // Log payment data for each student
-      studentsData.forEach(student => {
-        console.log(`DataLoader: Student ${student.name} has ${student.payments?.length || 0} payments`, student.payments || []);
-      });
-      
       // Enhance students with room and PG information
       const enhancedStudents = enhanceStudentsWithRoomInfo(studentsData, transformedRooms, pgsData);
       console.log("DataLoader: Enhanced students with room info:", enhancedStudents.length);
@@ -87,7 +82,7 @@ export const useDataLoader = (user: any) => {
       
       console.log("DataLoader: After role filtering - PGs:", filteredPGs.length, "Rooms:", filteredRooms.length, "Students:", filteredStudents.length);
       
-      // Set the filtered data
+      // Set the filtered data - this will trigger UI updates
       stableSetters.setPgs(filteredPGs);
       stableSetters.setRooms(filteredRooms);
       stableSetters.setStudents(filteredStudents);
@@ -102,7 +97,11 @@ export const useDataLoader = (user: any) => {
       
     } catch (error) {
       console.error('DataLoader: Error loading data:', error);
-      // Don't throw error, just log it and continue
+      // Clear data on error
+      stableSetters.setPgs([]);
+      stableSetters.setRooms([]);
+      stableSetters.setStudents([]);
+      stableSetters.setUsers([]);
     } finally {
       setIsLoading(false);
     }
