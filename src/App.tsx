@@ -26,133 +26,125 @@ import './App.css';
 
 const queryClient = new QueryClient();
 
+// Wrapper component to ensure DataProvider is available for protected routes
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <DataProvider>
+      <AuthGuard>
+        <AppLayout>
+          {children}
+        </AppLayout>
+      </AuthGuard>
+    </DataProvider>
+  );
+};
+
+// Wrapper for routes that require specific roles
+const ProtectedRoleRoute = ({ children, requiredRole }: { children: React.ReactNode; requiredRole: string }) => {
+  return (
+    <DataProvider>
+      <AuthGuard requiredRole={requiredRole}>
+        <AppLayout>
+          {children}
+        </AppLayout>
+      </AuthGuard>
+    </DataProvider>
+  );
+};
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <DataProvider>
-          <Router>
-            <div className="min-h-screen bg-background w-full">
-              <Routes>
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/" element={
-                  <AuthGuard>
-                    <AppLayout>
-                      <Index />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="/profile" element={
-                  <AuthGuard>
-                    <AppLayout>
-                      <ProfilePage />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="/dashboard/admin" element={
-                  <AuthGuard requiredRole="admin">
-                    <AppLayout>
-                      <AdminDashboard />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="/dashboard/manager" element={
-                  <AuthGuard requiredRole="manager">
-                    <AppLayout>
-                      <ManagerDashboard />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="/dashboard/accountant" element={
-                  <AuthGuard requiredRole="accountant">
-                    <AppLayout>
-                      <AccountantDashboard />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="/students" element={
-                  <AuthGuard>
-                    <AppLayout>
-                      <StudentsPage />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="/students/add" element={
-                  <AuthGuard>
-                    <AppLayout>
-                      <AddStudentPage />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="/add-student" element={
-                  <AuthGuard>
-                    <AppLayout>
-                      <AddStudentPage />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="/edit-student/:id" element={
-                  <AuthGuard>
-                    <AppLayout>
-                      <AddStudentPage />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="/payments" element={
-                  <AuthGuard>
-                    <AppLayout>
-                      <PaymentsPage />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="/reports" element={
-                  <AuthGuard>
-                    <AppLayout>
-                      <ReportsPage />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="/settings" element={
-                  <AuthGuard>
-                    <AppLayout>
-                      <SettingsPage />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="/users" element={
-                  <AuthGuard requiredRole="admin">
-                    <AppLayout>
-                      <UsersPage />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="/pg-management" element={
-                  <AuthGuard>
-                    <AppLayout>
-                      <PGManagementPage />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="/room-management" element={
-                  <AuthGuard>
-                    <AppLayout>
-                      <RoomManagement />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="/backup-logs" element={
-                  <AuthGuard requiredRole="admin">
-                    <AppLayout>
-                      <BackupLogsPage />
-                    </AppLayout>
-                  </AuthGuard>
-                } />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-              <Toaster />
-            </div>
-          </Router>
-        </DataProvider>
+        <Router>
+          <div className="min-h-screen bg-background w-full">
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              } />
+              <Route path="/dashboard/admin" element={
+                <ProtectedRoleRoute requiredRole="admin">
+                  <AdminDashboard />
+                </ProtectedRoleRoute>
+              } />
+              <Route path="/dashboard/manager" element={
+                <ProtectedRoleRoute requiredRole="manager">
+                  <ManagerDashboard />
+                </ProtectedRoleRoute>
+              } />
+              <Route path="/dashboard/accountant" element={
+                <ProtectedRoleRoute requiredRole="accountant">
+                  <AccountantDashboard />
+                </ProtectedRoleRoute>
+              } />
+              <Route path="/students" element={
+                <ProtectedRoute>
+                  <StudentsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/students/add" element={
+                <ProtectedRoute>
+                  <AddStudentPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/add-student" element={
+                <ProtectedRoute>
+                  <AddStudentPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/edit-student/:id" element={
+                <ProtectedRoute>
+                  <AddStudentPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/payments" element={
+                <ProtectedRoute>
+                  <PaymentsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/reports" element={
+                <ProtectedRoute>
+                  <ReportsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/settings" element={
+                <ProtectedRoute>
+                  <SettingsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/users" element={
+                <ProtectedRoleRoute requiredRole="admin">
+                  <UsersPage />
+                </ProtectedRoleRoute>
+              } />
+              <Route path="/pg-management" element={
+                <ProtectedRoute>
+                  <PGManagementPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/room-management" element={
+                <ProtectedRoute>
+                  <RoomManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/backup-logs" element={
+                <ProtectedRoleRoute requiredRole="admin">
+                  <BackupLogsPage />
+                </ProtectedRoleRoute>
+              } />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <Toaster />
+          </div>
+        </Router>
       </AuthProvider>
     </QueryClientProvider>
   );
