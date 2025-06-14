@@ -5,6 +5,7 @@ import { PG, RoomType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { PGFormValues } from '@/components/pg/types';
 import { FloorAllocation } from '@/components/pg/PGFormRoomAllocation';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UsePGFormSubmitProps {
   form: UseFormReturn<PGFormValues>;
@@ -43,6 +44,20 @@ export const usePGFormSubmit = ({
     try {
       setIsSubmitting(true);
       console.log("usePGFormSubmit: Form submission started with values:", values);
+
+      // Check authentication status first
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      console.log("usePGFormSubmit: Auth check:", { user: user?.email, authError });
+      
+      if (authError || !user) {
+        console.error("usePGFormSubmit: Authentication failed:", authError);
+        toast({
+          title: 'Authentication Error',
+          description: 'Please log in again to continue.',
+          variant: 'destructive'
+        });
+        return;
+      }
 
       // Basic validation
       if (!values.name?.trim()) {
@@ -137,7 +152,9 @@ export const usePGFormSubmit = ({
       let errorMessage = `Failed to ${isEdit ? 'update' : 'create'} PG. Please try again.`;
       
       if (error.message) {
-        if (error.message.includes('duplicate') || error.message.includes('unique')) {
+        if (error.message.includes('Please log in')) {
+          errorMessage = 'Authentication expired. Please log in again.';
+        } else if (error.message.includes('duplicate') || error.message.includes('unique')) {
           errorMessage = 'A PG with this name already exists. Please choose a different name.';
         } else if (error.message.includes('network') || error.message.includes('connection')) {
           errorMessage = 'Network error. Please check your connection and try again.';

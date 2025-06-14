@@ -25,10 +25,10 @@ interface DataProviderProps {
 }
 
 export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
-  console.log("DataContext: Current user:", user?.email, user?.role, user?.assignedPGs);
+  console.log("DataContext: Current user:", user?.email, user?.user_metadata?.role, user?.user_metadata?.assignedPGs);
 
   // Use the unified data loader hook
   const {
@@ -53,8 +53,8 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
   // Load data when user changes
   useEffect(() => {
-    if (user && user.id) {
-      console.log("DataContext: User authenticated, loading data for:", user.email, user.role);
+    if (!authLoading && user && user.id) {
+      console.log("DataContext: User authenticated, loading data for:", user.email);
       loadAllData().catch(error => {
         console.error("DataContext: Error loading data:", error);
         toast({
@@ -63,14 +63,14 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
           variant: 'destructive'
         });
       });
-    } else {
+    } else if (!authLoading && !user) {
       console.log("DataContext: No authenticated user, clearing all data");
       setPgs([]);
       setRooms([]);
       setStudents([]);
       setUsers([]);
     }
-  }, [user?.id, user?.role, loadAllData, setPgs, setRooms, setStudents, setUsers, toast]);
+  }, [user?.id, authLoading, loadAllData, setPgs, setRooms, setStudents, setUsers, toast]);
 
   // Create the context value
   const value: DataContextType = {
@@ -78,7 +78,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     rooms,
     students,
     users,
-    isLoading,
+    isLoading: isLoading || authLoading,
     ...pgOperations,
     ...roomOperations,
     ...studentOperations,
@@ -87,7 +87,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     refreshAllData
   };
 
-  console.log("DataContext: Providing data - PGs:", pgs.length, "Rooms:", rooms.length, "Students:", students.length, "Users:", users.length);
+  console.log("DataContext: Providing data - PGs:", pgs.length, "Rooms:", rooms.length, "Students:", students.length, "Users:", users.length, "Auth loading:", authLoading, "Data loading:", isLoading);
 
   return (
     <DataContext.Provider value={value}>

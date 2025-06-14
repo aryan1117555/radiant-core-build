@@ -7,11 +7,21 @@ export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
   console.log('Creating new PG with data:', pgData);
   
   try {
-    // Check if user is authenticated
+    // Check if user is authenticated with better error handling
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      throw new Error('User not authenticated');
+    console.log('Auth check result:', { user: user?.email, authError });
+    
+    if (authError) {
+      console.error('Authentication error:', authError);
+      throw new Error(`Authentication failed: ${authError.message}`);
     }
+    
+    if (!user) {
+      console.error('No authenticated user found');
+      throw new Error('Please log in to create a PG');
+    }
+
+    console.log('User authenticated successfully:', user.email);
 
     // Validate required fields
     if (!pgData.name?.trim()) {
@@ -88,6 +98,8 @@ export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
       revenue: data.revenue || 0,
       occupancyRate: 0,
       monthlyRent: data.monthly_rent || 0,
+      actualOccupancy: 0,
+      totalCapacity: data.total_rooms || 0,
       managerId: data.manager_id,
       manager: pgData.manager
     };

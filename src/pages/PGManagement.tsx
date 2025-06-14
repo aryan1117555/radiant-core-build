@@ -4,6 +4,7 @@ import PGPageHeader from '@/components/pg/management/PGPageHeader';
 import PGFilters from '@/components/pg/management/PGFilters';
 import PGTabContent from '@/components/pg/management/PGTabContent';
 import PGDialogManager from '@/components/pg/management/PGDialogManager';
+import AuthDebug from '@/components/AuthDebug';
 import { usePGDialogs } from '@/hooks/usePGDialogs';
 import { usePGManagement } from '@/hooks/usePGManagement';
 import { usePGOperations } from '@/hooks/usePGOperations';
@@ -52,6 +53,8 @@ const PGManagement = () => {
 
   return (
     <div className="page-container space-y-6">
+      <AuthDebug />
+      
       <PGPageHeader 
         onAddNew={handleAddNew}
         isProcessing={loading}
