@@ -59,7 +59,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (error) {
           console.error('AuthProvider: Session error:', error);
         } else if (session?.user) {
-          // Enhance user with metadata
+          // Enhance user with metadata and sync with users table
           const enhancedUser = await enhanceUserWithMetadata(session.user);
           setUser(enhancedUser);
         } else {
@@ -94,18 +94,68 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const enhanceUserWithMetadata = async (supabaseUser: SupabaseUser): Promise<User> => {
-    // Get user metadata from user_metadata or app_metadata
-    const metadata = supabaseUser.user_metadata || {};
-    const appMetadata = supabaseUser.app_metadata || {};
-    
-    return {
-      ...supabaseUser,
-      name: metadata.name || metadata.full_name || supabaseUser.email?.split('@')[0] || 'User',
-      role: metadata.role || appMetadata.role || 'admin', // Default to admin for now
-      assignedPGs: metadata.assignedPGs || appMetadata.assignedPGs || [],
-      status: 'active',
-      lastLogin: new Date().toISOString()
-    };
+    try {
+      // Try to get user data from users table first
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', supabaseUser.id)
+        .single();
+
+      if (!error && userData) {
+        // User exists in users table, use that data
+        return {
+          ...supabaseUser,
+          name: userData.name,
+          role: userData.role,
+          assignedPGs: userData.assignedPGs || [],
+          status: userData.status,
+          lastLogin: userData.lastLogin
+        };
+      } else {
+        // User doesn't exist in users table, create entry and use metadata
+        const metadata = supabaseUser.user_metadata || {};
+        const appMetadata = supabaseUser.app_metadata || {};
+        
+        const newUserData = {
+          id: supabaseUser.id,
+          email: supabaseUser.email || '',
+          name: metadata.name || metadata.full_name || supabaseUser.email?.split('@')[0] || 'User',
+          role: metadata.role || appMetadata.role || 'admin',
+          assignedPGs: metadata.assignedPGs || appMetadata.assignedPGs || [],
+          status: 'active',
+          lastLogin: new Date().toISOString()
+        };
+
+        // Insert into users table
+        await supabase
+          .from('users')
+          .insert(newUserData)
+          .select()
+          .single();
+
+        return {
+          ...supabaseUser,
+          name: newUserData.name,
+          role: newUserData.role,
+          assignedPGs: newUserData.assignedPGs,
+          status: newUserData.status,
+          lastLogin: newUserData.lastLogin
+        };
+      }
+    } catch (error) {
+      console.error('Error enhancing user with metadata:', error);
+      // Fallback to basic user data
+      const metadata = supabaseUser.user_metadata || {};
+      return {
+        ...supabaseUser,
+        name: metadata.name || metadata.full_name || supabaseUser.email?.split('@')[0] || 'User',
+        role: metadata.role || 'admin',
+        assignedPGs: metadata.assignedPGs || [],
+        status: 'active',
+        lastLogin: new Date().toISOString()
+      };
+    }
   };
 
   const signIn = async (email: string, password: string) => {
@@ -121,6 +171,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     console.log('AuthProvider: Sign in successful:', data.user?.email);
+    
+    // Update lastLogin in users table
+    if (data.user) {
+      await supabase
+        .from('users')
+        .update({ lastLogin: new Date().toISOString() })
+        .eq('id', data.user.id);
+    }
   };
 
   const signOut = async () => {
