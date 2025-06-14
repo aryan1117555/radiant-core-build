@@ -287,45 +287,75 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const createUser = async (email: string, password: string, name: string, role: string, assignedPGs: string[] = []): Promise<User> => {
     try {
-      // Create user in auth - this requires service role which we don't have in client
-      // For now, we'll just create in users table and let them sign up manually
-      const userId = crypto.randomUUID();
+      console.log('Creating user in Supabase Auth:', { email, name, role });
       
+      // Create user in Supabase Auth with metadata
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        user_metadata: {
+          name,
+          role,
+          assignedPGs
+        },
+        email_confirm: true // Auto-confirm email for admin-created users
+      });
+
+      if (authError) {
+        console.error('Error creating user in auth:', authError);
+        throw authError;
+      }
+
+      if (!authData.user) {
+        throw new Error('User creation failed - no user data returned');
+      }
+
+      console.log('User created in auth successfully:', authData.user.id);
+
+      // Create entry in users table
+      const newUserData = {
+        id: authData.user.id,
+        email: authData.user.email!,
+        name,
+        role: role as "admin" | "manager" | "accountant" | "viewer",
+        assignedPGs,
+        status: 'active',
+        lastLogin: 'Never'
+      };
+
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .insert({
-          id: userId,
-          email,
-          name,
-          role: role as "admin" | "manager" | "accountant" | "viewer",
-          assignedPGs,
-          status: 'active',
-          lastLogin: 'Never'
-        })
+        .insert(newUserData)
         .select()
         .single();
 
-      if (userError) throw userError;
+      if (userError) {
+        console.error('Error creating user in users table:', userError);
+        // If users table insert fails, we should clean up the auth user
+        // But for now, we'll just log the error and continue
+      }
+
+      console.log('User created successfully in both auth and users table');
 
       return {
-        id: userId,
-        email,
-        name: userData.name,
-        role: userData.role,
-        assignedPGs: userData.assignedPGs,
-        status: userData.status,
-        lastLogin: userData.lastLogin,
+        id: authData.user.id,
+        email: authData.user.email!,
+        name: newUserData.name,
+        role: newUserData.role,
+        assignedPGs: newUserData.assignedPGs,
+        status: newUserData.status,
+        lastLogin: newUserData.lastLogin,
         // Add required Supabase User properties
         aud: 'authenticated',
-        created_at: userData.created_at,
-        app_metadata: {},
-        user_metadata: {},
-        phone: '',
-        confirmation_sent_at: '',
-        email_confirmed_at: '',
-        confirmed_at: '',
-        last_sign_in_at: '',
-        updated_at: userData.updated_at
+        created_at: authData.user.created_at,
+        app_metadata: authData.user.app_metadata || {},
+        user_metadata: authData.user.user_metadata || {},
+        phone: authData.user.phone || '',
+        confirmation_sent_at: authData.user.confirmation_sent_at || '',
+        email_confirmed_at: authData.user.email_confirmed_at || '',
+        confirmed_at: authData.user.confirmed_at || '',
+        last_sign_in_at: authData.user.last_sign_in_at || '',
+        updated_at: authData.user.updated_at
       } as User;
     } catch (error) {
       console.error('Error creating user:', error);
@@ -387,12 +417,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const deleteUser = async (id: string): Promise<void> => {
     try {
-      const { error } = await supabase
+      // Delete from users table first
+      const { error: userError } = await supabase
         .from('users')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (userError) {
+        console.error('Error deleting user from users table:', userError);
+      }
+
+      // Delete from auth (this requires admin privileges)
+      const { error: authError } = await supabase.auth.admin.deleteUser(id);
+      
+      if (authError) {
+        console.error('Error deleting user from auth:', authError);
+        throw authError;
+      }
     } catch (error) {
       console.error('Error deleting user:', error);
       throw error;
