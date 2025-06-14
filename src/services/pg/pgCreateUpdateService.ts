@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PG, ensureStringArray, ensurePGType } from '@/types';
 import { logError } from './pgUtils';
@@ -7,12 +6,6 @@ export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
   console.log('Creating new PG with data:', pgData);
   
   try {
-    // Check authentication first
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      throw new Error('Authentication required to create PG');
-    }
-    
     // Validate required fields
     if (!pgData.name?.trim()) {
       throw new Error('PG name is required');
@@ -41,7 +34,7 @@ export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
 
     console.log('Inserting PG data into database:', dbData);
 
-    // Try to insert with explicit RLS bypass for admin users
+    // Insert the PG data
     const { data, error } = await supabase
       .from('pgs')
       .insert([dbData])
@@ -112,12 +105,6 @@ export const updatePG = async (id: string, pgData: PG): Promise<PG> => {
   console.log('Updating PG with ID:', id, 'Data:', pgData);
   
   try {
-    // Check authentication first
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      throw new Error('Authentication required to update PG');
-    }
-    
     // Validate required fields
     if (!pgData.name?.trim()) {
       throw new Error('PG name is required');

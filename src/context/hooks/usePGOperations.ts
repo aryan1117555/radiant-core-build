@@ -2,7 +2,6 @@
 import { PG } from '@/types';
 import { addPG as addPGService, updatePG as updatePGService, deletePG as deletePGService } from '@/services/pg';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 
 export const usePGOperations = (refreshAllData: () => Promise<void>) => {
   const { toast } = useToast();
@@ -10,12 +9,6 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
   const handleAddPG = async (pg: Omit<PG, 'id'>): Promise<PG> => {
     try {
       console.log("DataContext PGOps: Adding PG:", pg.name);
-      
-      // Check if user is authenticated
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('You must be logged in to create a PG');
-      }
       
       // Validate required fields
       if (!pg.name?.trim()) {
@@ -50,7 +43,7 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
       if (error instanceof Error) {
         if (error.message.includes('row-level security')) {
           errorMessage = 'Permission denied. Please check your user permissions or contact an administrator.';
-        } else if (error.message.includes('logged in')) {
+        } else if (error.message.includes('Authentication required')) {
           errorMessage = 'You must be logged in to create a PG.';
         } else {
           errorMessage = error.message;
@@ -69,12 +62,6 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
   const handleUpdatePG = async (pg: PG): Promise<PG> => {
     try {
       console.log("DataContext PGOps: Updating PG:", pg.name);
-      
-      // Check if user is authenticated
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('You must be logged in to update a PG');
-      }
       
       // Validate required fields
       if (!pg.name?.trim()) {
@@ -120,12 +107,6 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
   const handleDeletePG = async (pgId: string) => {
     try {
       console.log("DataContext PGOps: Deleting PG:", pgId);
-      
-      // Check if user is authenticated
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('You must be logged in to delete a PG');
-      }
       
       await deletePGService(pgId);
       console.log("DataContext PGOps: PG deleted successfully");
