@@ -2,6 +2,7 @@
 import { PG } from '@/types';
 import { addPG as addPGService, updatePG as updatePGService, deletePG as deletePGService } from '@/services/pg';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export const usePGOperations = (refreshAllData: () => Promise<void>) => {
   const { toast } = useToast();
@@ -9,6 +10,12 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
   const handleAddPG = async (pg: Omit<PG, 'id'>): Promise<PG> => {
     try {
       console.log("DataContext PGOps: Adding PG:", pg.name);
+      
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('You must be logged in to create a PG');
+      }
       
       // Validate required fields
       if (!pg.name?.trim()) {
@@ -41,7 +48,13 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
       
       let errorMessage = 'Failed to create PG. Please try again.';
       if (error instanceof Error) {
-        errorMessage = error.message;
+        if (error.message.includes('row-level security')) {
+          errorMessage = 'Permission denied. Please check your user permissions or contact an administrator.';
+        } else if (error.message.includes('logged in')) {
+          errorMessage = 'You must be logged in to create a PG.';
+        } else {
+          errorMessage = error.message;
+        }
       }
       
       toast({
@@ -56,6 +69,12 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
   const handleUpdatePG = async (pg: PG): Promise<PG> => {
     try {
       console.log("DataContext PGOps: Updating PG:", pg.name);
+      
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('You must be logged in to update a PG');
+      }
       
       // Validate required fields
       if (!pg.name?.trim()) {
@@ -82,7 +101,11 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
       
       let errorMessage = 'Failed to update PG. Please try again.';
       if (error instanceof Error) {
-        errorMessage = error.message;
+        if (error.message.includes('row-level security')) {
+          errorMessage = 'Permission denied. Please check your user permissions.';
+        } else {
+          errorMessage = error.message;
+        }
       }
       
       toast({
@@ -97,6 +120,13 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
   const handleDeletePG = async (pgId: string) => {
     try {
       console.log("DataContext PGOps: Deleting PG:", pgId);
+      
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('You must be logged in to delete a PG');
+      }
+      
       await deletePGService(pgId);
       console.log("DataContext PGOps: PG deleted successfully");
       
@@ -109,9 +139,15 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
       });
     } catch (error) {
       console.error("DataContext PGOps: Error deleting PG:", error);
+      
+      let errorMessage = 'Failed to delete PG. Please try again.';
+      if (error instanceof Error && error.message.includes('row-level security')) {
+        errorMessage = 'Permission denied. Please check your user permissions.';
+      }
+      
       toast({
         title: 'Error',
-        description: 'Failed to delete PG. Please try again.',
+        description: errorMessage,
         variant: 'destructive'
       });
       throw error;

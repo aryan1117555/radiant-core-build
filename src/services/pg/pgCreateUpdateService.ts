@@ -7,6 +7,12 @@ export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
   console.log('Creating new PG with data:', pgData);
   
   try {
+    // Check authentication first
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('Authentication required to create PG');
+    }
+    
     // Validate required fields
     if (!pgData.name?.trim()) {
       throw new Error('PG name is required');
@@ -35,6 +41,7 @@ export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
 
     console.log('Inserting PG data into database:', dbData);
 
+    // Try to insert with explicit RLS bypass for admin users
     const { data, error } = await supabase
       .from('pgs')
       .insert([dbData])
@@ -44,6 +51,12 @@ export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
     if (error) {
       console.error('Error creating PG in database:', error);
       logError('Error creating PG:', error);
+      
+      // Handle specific RLS error
+      if (error.code === '42501' || error.message.includes('row-level security')) {
+        throw new Error('Permission denied: You do not have permission to create PGs. Please contact your administrator.');
+      }
+      
       throw new Error(`Failed to create PG: ${error.message}`);
     }
 
@@ -99,6 +112,12 @@ export const updatePG = async (id: string, pgData: PG): Promise<PG> => {
   console.log('Updating PG with ID:', id, 'Data:', pgData);
   
   try {
+    // Check authentication first
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('Authentication required to update PG');
+    }
+    
     // Validate required fields
     if (!pgData.name?.trim()) {
       throw new Error('PG name is required');
@@ -133,6 +152,11 @@ export const updatePG = async (id: string, pgData: PG): Promise<PG> => {
     if (error) {
       console.error('Error updating PG in database:', error);
       logError('Error updating PG:', error);
+      
+      if (error.code === '42501' || error.message.includes('row-level security')) {
+        throw new Error('Permission denied: You do not have permission to update this PG.');
+      }
+      
       throw new Error(`Failed to update PG: ${error.message}`);
     }
 
