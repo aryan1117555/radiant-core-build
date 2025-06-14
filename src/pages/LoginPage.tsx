@@ -164,19 +164,7 @@ const LoginPage: React.FC = () => {
             </Form>
           </CardContent>
           
-          <CardFooter className="flex flex-col space-y-4">
-            <div className="text-sm text-center text-muted-foreground">
-              
-              <div className="space-y-2">
-                
-                
-                
-                
-                
-              </div>
-              
-            </div>
-          </CardFooter>
+          
         </Card>
       </div>
     </div>;
