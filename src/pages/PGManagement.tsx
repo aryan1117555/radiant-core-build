@@ -17,7 +17,6 @@ import { usePGDialogs } from '@/hooks/usePGDialogs';
 const PGManagement = () => {
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -59,15 +58,10 @@ const PGManagement = () => {
 
   // Enhanced handlers that integrate with dialog management
   const onAddPG = async (pg: Omit<PG, 'id'>): Promise<boolean> => {
-    if (isProcessing) {
-      console.log("PGManagement: Already processing, skipping");
-      return false;
-    }
-
     try {
-      setIsProcessing(true);
       console.log("PGManagement: onAddPG called with:", pg);
       
+      // Use the addPG function from DataContext which returns the created PG
       const newPG = await addPG(pg);
       console.log("PGManagement: PG created successfully:", newPG);
       
@@ -95,19 +89,11 @@ const PGManagement = () => {
       });
       
       return false;
-    } finally {
-      setIsProcessing(false);
     }
   };
 
   const onEditPG = async (pg: PG): Promise<boolean> => {
-    if (isProcessing) {
-      console.log("PGManagement: Already processing, skipping");
-      return false;
-    }
-
     try {
-      setIsProcessing(true);
       console.log("PGManagement: onEditPG called with:", pg);
       
       await updatePG(pg);
@@ -121,8 +107,6 @@ const PGManagement = () => {
     } catch (error) {
       console.error("PGManagement: Error in onEditPG:", error);
       return false;
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -132,13 +116,7 @@ const PGManagement = () => {
     
     if (!targetPgId || !targetPg) return false;
     
-    if (isProcessing) {
-      console.log("PGManagement: Already processing, skipping");
-      return false;
-    }
-    
     try {
-      setIsProcessing(true);
       console.log("PGManagement: onDeletePG called for:", targetPg.name);
       
       await deletePG(targetPgId);
@@ -152,8 +130,6 @@ const PGManagement = () => {
     } catch (error) {
       console.error("PGManagement: Error in onDeletePG:", error);
       return false;
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -177,7 +153,7 @@ const PGManagement = () => {
     <div className="page-container space-y-6">
       <PGPageHeader 
         onAddNew={handleAddNew}
-        isProcessing={isProcessing}
+        isProcessing={loading}
         loading={loading}
       />
       
@@ -196,7 +172,7 @@ const PGManagement = () => {
       {/* PG Content */}
       <div className="mt-6">
         <PGTabContent 
-          loading={loading || isProcessing}
+          loading={loading}
           filteredPGs={filteredPGs}
           onView={handleViewPG}
           onEdit={handleEditClick}
@@ -222,7 +198,7 @@ const PGManagement = () => {
         onEditPG={onEditPG}
         onDeletePG={onDeletePG}
         onEditClick={handleEditClick}
-        isProcessing={isProcessing}
+        isProcessing={loading}
       />
     </div>
   );

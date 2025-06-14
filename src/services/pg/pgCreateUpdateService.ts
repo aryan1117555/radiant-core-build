@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PG, ensureStringArray, ensurePGType } from '@/types';
 import { logError } from './pgUtils';
@@ -44,12 +45,6 @@ export const addPG = async (pgData: Omit<PG, 'id'>): Promise<PG> => {
     if (error) {
       console.error('Error creating PG in database:', error);
       logError('Error creating PG:', error);
-      
-      // Handle specific RLS error
-      if (error.code === '42501' || error.message.includes('row-level security')) {
-        throw new Error('Permission denied: You do not have permission to create PGs. Please contact your administrator.');
-      }
-      
       throw new Error(`Failed to create PG: ${error.message}`);
     }
 
@@ -139,11 +134,6 @@ export const updatePG = async (id: string, pgData: PG): Promise<PG> => {
     if (error) {
       console.error('Error updating PG in database:', error);
       logError('Error updating PG:', error);
-      
-      if (error.code === '42501' || error.message.includes('row-level security')) {
-        throw new Error('Permission denied: You do not have permission to update this PG.');
-      }
-      
       throw new Error(`Failed to update PG: ${error.message}`);
     }
 

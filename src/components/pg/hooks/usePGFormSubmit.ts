@@ -35,32 +35,6 @@ export const usePGFormSubmit = ({
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const updateRoomCapacities = async (pgId: string) => {
-    try {
-      for (const currentRoomType of roomTypes) {
-        const originalRoomType = originalRoomTypes.find(rt => rt.id === currentRoomType.id);
-        
-        if (originalRoomType && originalRoomType.capacity !== currentRoomType.capacity) {
-          console.log(`Updating capacity for room type ${currentRoomType.name} from ${originalRoomType.capacity} to ${currentRoomType.capacity}`);
-          
-          await updateRoomCapacityBulk(pgId, currentRoomType.name, currentRoomType.capacity);
-          
-          toast({
-            title: 'Room Capacities Updated',
-            description: `All rooms of type ${currentRoomType.name} now have a capacity of ${currentRoomType.capacity}`
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error updating room capacities:', error);
-      toast({
-        title: 'Warning',
-        description: 'Room capacity updates may not have been fully applied to all rooms.',
-        variant: 'destructive'
-      });
-    }
-  };
-
   const onSubmit = async (values: PGFormValues) => {
     if (isSubmitting) {
       console.log("usePGFormSubmit: Already submitting, ignoring duplicate submission");
@@ -120,6 +94,7 @@ export const usePGFormSubmit = ({
         }
       }
       
+      // Create the PG data object with proper structure for database insertion
       let pgData: PG | Omit<PG, 'id'> = {
         name: values.name.trim(),
         type: values.type as 'male' | 'female' | 'unisex',
@@ -131,7 +106,7 @@ export const usePGFormSubmit = ({
         images: images || [],
         amenities: [],
         roomTypes: roomTypes.map(rt => ({
-          id: rt.id,
+          id: rt.id || `rt_${Date.now()}_${Math.random()}`,
           name: rt.name,
           capacity: rt.capacity,
           amenities: Array.isArray(rt.amenities) ? rt.amenities : [],
@@ -148,15 +123,40 @@ export const usePGFormSubmit = ({
       
       console.log("usePGFormSubmit: Final PG data before save:", pgData);
       
+      // Add room allocations for new PGs
       if (!isEdit && roomAllocations.length > 0) {
         (pgData as any).roomAllocations = roomAllocations;
         console.log("usePGFormSubmit: Added room allocations to PG data");
-      } else if (isEdit && pg) {
-        await updateRoomCapacities(pg.id);
       }
       
+      // For edit mode, include the ID
       if (isEdit && pg) {
         (pgData as PG).id = pg.id;
+        
+        // Update room capacities if changed
+        for (const currentRoomType of roomTypes) {
+          const originalRoomType = originalRoomTypes.find(rt => rt.id === currentRoomType.id);
+          
+          if (originalRoomType && originalRoomType.capacity !== currentRoomType.capacity) {
+            console.log(`Updating capacity for room type ${currentRoomType.name} from ${originalRoomType.capacity} to ${currentRoomType.capacity}`);
+            
+            try {
+              await updateRoomCapacityBulk(pg.id, currentRoomType.name, currentRoomType.capacity);
+              
+              toast({
+                title: 'Room Capacities Updated',
+                description: `All rooms of type ${currentRoomType.name} now have a capacity of ${currentRoomType.capacity}`
+              });
+            } catch (error) {
+              console.error('Error updating room capacities:', error);
+              toast({
+                title: 'Warning',
+                description: 'Room capacity updates may not have been fully applied to all rooms.',
+                variant: 'destructive'
+              });
+            }
+          }
+        }
       }
       
       console.log("usePGFormSubmit: Calling onSave with data:", pgData);
@@ -164,10 +164,6 @@ export const usePGFormSubmit = ({
       
       if (success) {
         console.log("usePGFormSubmit: PG save successful");
-        toast({
-          title: 'Success',
-          description: `PG ${values.name} has been ${isEdit ? 'updated' : 'created'} successfully.`
-        });
         onClose();
         
         if (!isEdit) {
@@ -185,11 +181,6 @@ export const usePGFormSubmit = ({
         }
       } else {
         console.log("usePGFormSubmit: PG save failed");
-        toast({
-          title: 'Error',
-          description: `Failed to ${isEdit ? 'update' : 'create'} PG. Please check your inputs and try again.`,
-          variant: 'destructive'
-        });
       }
     } catch (error: any) {
       console.error("usePGFormSubmit: Error in form submit:", error);
@@ -203,6 +194,8 @@ export const usePGFormSubmit = ({
           errorMessage = 'Network error. Please check your connection and try again.';
         } else if (error.message.includes('validation')) {
           errorMessage = 'Please check all required fields and try again.';
+        } else {
+          errorMessage = error.message;
         }
       }
       

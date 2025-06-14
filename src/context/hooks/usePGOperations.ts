@@ -41,13 +41,7 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
       
       let errorMessage = 'Failed to create PG. Please try again.';
       if (error instanceof Error) {
-        if (error.message.includes('row-level security')) {
-          errorMessage = 'Permission denied. Please check your user permissions or contact an administrator.';
-        } else if (error.message.includes('Authentication required')) {
-          errorMessage = 'You must be logged in to create a PG.';
-        } else {
-          errorMessage = error.message;
-        }
+        errorMessage = error.message;
       }
       
       toast({
@@ -88,11 +82,7 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
       
       let errorMessage = 'Failed to update PG. Please try again.';
       if (error instanceof Error) {
-        if (error.message.includes('row-level security')) {
-          errorMessage = 'Permission denied. Please check your user permissions.';
-        } else {
-          errorMessage = error.message;
-        }
+        errorMessage = error.message;
       }
       
       toast({
@@ -122,8 +112,8 @@ export const usePGOperations = (refreshAllData: () => Promise<void>) => {
       console.error("DataContext PGOps: Error deleting PG:", error);
       
       let errorMessage = 'Failed to delete PG. Please try again.';
-      if (error instanceof Error && error.message.includes('row-level security')) {
-        errorMessage = 'Permission denied. Please check your user permissions.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
       }
       
       toast({
