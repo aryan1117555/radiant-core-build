@@ -239,66 +239,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('AuthProvider: Sign out successful');
   };
 
-  // User management functions with proper signatures
-  const getUsers = async (): Promise<User[]> => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      
-      // Transform database users to User interface
-      return (data || []).map(dbUser => {
-        // Properly handle assignedPGs conversion from JSON to string array
-        const assignedPGs = Array.isArray(dbUser.assignedPGs) 
-          ? dbUser.assignedPGs 
-          : dbUser.assignedPGs 
-            ? JSON.parse(dbUser.assignedPGs as string) 
-            : [];
-
-        return {
-          id: dbUser.id,
-          email: dbUser.email,
-          name: dbUser.name,
-          role: dbUser.role,
-          assignedPGs: assignedPGs,
-          status: dbUser.status,
-          lastLogin: dbUser.lastLogin,
-          // Add required Supabase User properties with defaults
-          aud: 'authenticated',
-          created_at: dbUser.created_at || new Date().toISOString(),
-          app_metadata: {},
-          user_metadata: {},
-          phone: '',
-          confirmation_sent_at: '',
-          email_confirmed_at: '',
-          confirmed_at: '',
-          last_sign_in_at: '',
-          updated_at: dbUser.updated_at || new Date().toISOString()
-        } as User;
-      });
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      return [];
-    }
-  };
-
   const createUser = async (email: string, password: string, name: string, role: string, assignedPGs: string[] = []): Promise<User> => {
     try {
-      console.log('Creating user in Supabase Auth:', { email, name, role });
+      console.log('Creating user with client-side approach:', { email, name, role });
       
-      // Create user in Supabase Auth with metadata
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      // Since we can't use admin.createUser on client side, we'll create a regular signup
+      // and then update the user data in our users table
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
-        user_metadata: {
-          name,
-          role,
-          assignedPGs
-        },
-        email_confirm: true // Auto-confirm email for admin-created users
+        options: {
+          data: {
+            name,
+            role,
+            assignedPGs
+          }
+        }
       });
 
       if (authError) {
@@ -417,7 +373,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const deleteUser = async (id: string): Promise<void> => {
     try {
-      // Delete from users table first
+      // For client-side, we can only delete from users table
+      // Auth user deletion requires admin privileges
       const { error: userError } = await supabase
         .from('users')
         .delete()
@@ -425,18 +382,58 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (userError) {
         console.error('Error deleting user from users table:', userError);
+        throw userError;
       }
 
-      // Delete from auth (this requires admin privileges)
-      const { error: authError } = await supabase.auth.admin.deleteUser(id);
-      
-      if (authError) {
-        console.error('Error deleting user from auth:', authError);
-        throw authError;
-      }
+      console.log('User deleted from users table successfully');
     } catch (error) {
       console.error('Error deleting user:', error);
       throw error;
+    }
+  };
+
+  const getUsers = async (): Promise<User[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      
+      // Transform database users to User interface
+      return (data || []).map(dbUser => {
+        // Properly handle assignedPGs conversion from JSON to string array
+        const assignedPGs = Array.isArray(dbUser.assignedPGs) 
+          ? dbUser.assignedPGs 
+          : dbUser.assignedPGs 
+            ? JSON.parse(dbUser.assignedPGs as string) 
+            : [];
+
+        return {
+          id: dbUser.id,
+          email: dbUser.email,
+          name: dbUser.name,
+          role: dbUser.role,
+          assignedPGs: assignedPGs,
+          status: dbUser.status,
+          lastLogin: dbUser.lastLogin,
+          // Add required Supabase User properties with defaults
+          aud: 'authenticated',
+          created_at: dbUser.created_at || new Date().toISOString(),
+          app_metadata: {},
+          user_metadata: {},
+          phone: '',
+          confirmation_sent_at: '',
+          email_confirmed_at: '',
+          confirmed_at: '',
+          last_sign_in_at: '',
+          updated_at: dbUser.updated_at || new Date().toISOString()
+        } as User;
+      });
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      return [];
     }
   };
 
