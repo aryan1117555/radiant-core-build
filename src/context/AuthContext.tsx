@@ -1,7 +1,7 @@
-
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { SessionService } from '@/services/sessionService';
 
 // Extended User interface with custom properties
 export interface User extends SupabaseUser {
@@ -62,8 +62,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Enhance user with metadata and sync with users table
           const enhancedUser = await enhanceUserWithMetadata(session.user);
           setUser(enhancedUser);
+          
+          // Create session tracking
+          await SessionService.createSession(session.user.id);
         } else {
-          setUser(null);
+          // Check if there's a valid session cookie
+          const validSession = await SessionService.validateSession();
+          if (!validSession) {
+            setUser(null);
+          }
         }
       } catch (error) {
         console.error('AuthProvider: Error getting session:', error);
@@ -81,8 +88,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (session?.user) {
         const enhancedUser = await enhanceUserWithMetadata(session.user);
         setUser(enhancedUser);
+        
+        // Create or validate session
+        if (event === 'SIGNED_IN') {
+          await SessionService.createSession(session.user.id);
+        }
       } else {
         setUser(null);
+        
+        // Invalidate session on sign out
+        if (event === 'SIGNED_OUT') {
+          await SessionService.invalidateSession();
+        }
       }
       setLoading(false);
     });
@@ -198,6 +215,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .from('users')
           .update({ lastLogin: new Date().toISOString() })
           .eq('id', data.user.id);
+        
+        // Create session tracking
+        await SessionService.createSession(data.user.id);
       }
     } catch (error) {
       console.error('AuthProvider: Sign in failed:', error);
@@ -207,6 +227,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signOut = async () => {
     console.log('AuthProvider: Signing out');
+    
+    // Invalidate current session before auth sign out
+    await SessionService.invalidateSession();
+    
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error('AuthProvider: Sign out error:', error);
