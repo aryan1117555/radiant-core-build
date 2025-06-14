@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, User } from '@/context/AuthContext';
 import { User as LucideUser, Trash2, EyeIcon, EyeOffIcon } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,7 +27,7 @@ type UserFormValues = z.infer<typeof userFormSchema>;
 
 const UserManagement = () => {
   const { user, createUser, deleteUser, getUsers } = useAuth();
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -303,7 +303,7 @@ const UserManagement = () => {
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         user.role === 'admin' ? 'bg-primary/10 text-primary' : 'bg-secondary/10 text-secondary'
                       }`}>
-                        {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                        {user.role?.charAt(0).toUpperCase() + user.role?.slice(1)}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">

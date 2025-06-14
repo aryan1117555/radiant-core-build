@@ -1,7 +1,8 @@
 
 import React from 'react';
 import { UseFormReturn } from 'react-hook-form';
-import { User, RoomType } from '@/types';
+import { RoomType } from '@/types';
+import { User } from '@/context/AuthContext';
 import { PGFormValues } from '@/components/pg/types';
 import { FloorAllocation } from '@/components/pg/PGFormRoomAllocation';
 import PGFormBasicInfo from '@/components/pg/PGFormBasicInfo';

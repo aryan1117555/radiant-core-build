@@ -21,8 +21,8 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   logout: () => Promise<void>; // Alias for signOut
   getUsers: () => Promise<User[]>;
-  createUser: (userData: any) => Promise<User>;
-  updateUser: (id: string, userData: any) => Promise<User>;
+  createUser: (email: string, password: string, name: string, role: string, assignedPGs?: string[]) => Promise<User>;
+  updateUser: (userData: Partial<User>) => Promise<User>;
   deleteUser: (id: string) => Promise<void>;
 }
 
@@ -133,7 +133,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('AuthProvider: Sign out successful');
   };
 
-  // User management functions
+  // User management functions with proper signatures
   const getUsers = async (): Promise<User[]> => {
     try {
       const { data, error } = await supabase
@@ -142,40 +142,115 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .order('name', { ascending: true });
 
       if (error) throw error;
-      return data || [];
+      
+      // Transform database users to User interface
+      return (data || []).map(dbUser => ({
+        id: dbUser.id,
+        email: dbUser.email,
+        name: dbUser.name,
+        role: dbUser.role,
+        assignedPGs: Array.isArray(dbUser.assignedPGs) ? dbUser.assignedPGs : [],
+        status: dbUser.status,
+        lastLogin: dbUser.lastLogin,
+        // Add required Supabase User properties with defaults
+        aud: 'authenticated',
+        created_at: dbUser.created_at || new Date().toISOString(),
+        app_metadata: {},
+        user_metadata: {},
+        phone: '',
+        confirmation_sent_at: '',
+        email_confirmed_at: '',
+        confirmed_at: '',
+        last_sign_in_at: '',
+        updated_at: dbUser.updated_at || new Date().toISOString()
+      } as User));
     } catch (error) {
       console.error('Error fetching users:', error);
       return [];
     }
   };
 
-  const createUser = async (userData: any): Promise<User> => {
+  const createUser = async (email: string, password: string, name: string, role: string, assignedPGs: string[] = []): Promise<User> => {
     try {
-      const { data, error } = await supabase
+      // Create user in auth
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        user_metadata: { name, role, assignedPGs }
+      });
+
+      if (authError) throw authError;
+
+      // Create user in users table
+      const { data: userData, error: userError } = await supabase
         .from('users')
-        .insert([userData])
+        .insert([{
+          id: authData.user.id,
+          email,
+          name,
+          role,
+          assignedPGs,
+          status: 'active',
+          lastLogin: 'Never'
+        }])
         .select()
         .single();
 
-      if (error) throw error;
-      return data;
+      if (userError) throw userError;
+
+      return {
+        ...authData.user,
+        name: userData.name,
+        role: userData.role,
+        assignedPGs: userData.assignedPGs,
+        status: userData.status,
+        lastLogin: userData.lastLogin
+      } as User;
     } catch (error) {
       console.error('Error creating user:', error);
       throw error;
     }
   };
 
-  const updateUser = async (id: string, userData: any): Promise<User> => {
+  const updateUser = async (userData: Partial<User>): Promise<User> => {
     try {
+      if (!userData.id) throw new Error('User ID is required');
+
       const { data, error } = await supabase
         .from('users')
-        .update(userData)
-        .eq('id', id)
+        .update({
+          name: userData.name,
+          email: userData.email,
+          role: userData.role,
+          status: userData.status,
+          assignedPGs: userData.assignedPGs
+        })
+        .eq('id', userData.id)
         .select()
         .single();
 
       if (error) throw error;
-      return data;
+
+      return {
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        assignedPGs: data.assignedPGs,
+        status: data.status,
+        lastLogin: data.lastLogin,
+        // Add required Supabase User properties
+        aud: 'authenticated',
+        created_at: data.created_at,
+        app_metadata: {},
+        user_metadata: {},
+        phone: '',
+        confirmation_sent_at: '',
+        email_confirmed_at: '',
+        confirmed_at: '',
+        last_sign_in_at: '',
+        updated_at: data.updated_at
+      } as User;
     } catch (error) {
       console.error('Error updating user:', error);
       throw error;

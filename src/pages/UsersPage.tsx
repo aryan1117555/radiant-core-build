@@ -61,11 +61,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, User } from '@/context/AuthContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { User } from '@/types';
 import { fetchPGs } from '@/services';
 import { assignPGToUser, removePGFromUser } from '@/services/userService';
 
@@ -277,7 +276,7 @@ const UsersPage = () => {
 
   const openEditDialog = (user: User) => {
     setCurrentUser(user);
-    editForm.setValue('name', user.name);
+    editForm.setValue('name', user.name || '');
     editForm.setValue('email', user.email);
     editForm.setValue('role', user.role as any);
     setIsEditDialogOpen(true);
@@ -430,7 +429,7 @@ const UsersPage = () => {
     
     // Filter by search query
     if (searchQuery && 
-        !user.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
+        !user.name?.toLowerCase().includes(searchQuery.toLowerCase()) && 
         !user.email.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;
     }
@@ -504,8 +503,8 @@ const UsersPage = () => {
                         </td>
                         <td className="p-4">
                           <div className="flex items-center gap-2">
-                            {getRoleIcon(user.role)}
-                            {getRoleBadge(user.role)}
+                            {getRoleIcon(user.role || '')}
+                            {getRoleBadge(user.role || '')}
                           </div>
                         </td>
                         <td className="p-4 hidden md:table-cell">
