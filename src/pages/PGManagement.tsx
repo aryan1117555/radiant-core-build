@@ -1,34 +1,26 @@
 
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { useData } from '@/context/DataContext';
-import { PG } from '@/types';
-
-// Import our refactored components
+import React from 'react';
 import PGPageHeader from '@/components/pg/management/PGPageHeader';
 import PGFilters from '@/components/pg/management/PGFilters';
 import PGTabContent from '@/components/pg/management/PGTabContent';
 import PGDialogManager from '@/components/pg/management/PGDialogManager';
-
-// Import custom hooks
 import { usePGDialogs } from '@/hooks/usePGDialogs';
+import { usePGManagement } from '@/hooks/usePGManagement';
+import { usePGOperations } from '@/hooks/usePGOperations';
 
 const PGManagement = () => {
-  const [activeTab, setActiveTab] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const { user } = useAuth();
-  
-  // Use DataContext as the single source of truth
-  const { 
-    pgs: pgData, 
-    isLoading: loading,
-    refreshAllData,
+  const {
+    activeTab,
+    setActiveTab,
+    searchQuery,
+    setSearchQuery,
+    filteredPGs,
+    loading,
     addPG,
     updatePG,
     deletePG
-  } = useData();
+  } = usePGManagement();
 
-  // Use custom hooks for dialog management
   const {
     addDialogOpen,
     setAddDialogOpen,
@@ -46,85 +38,17 @@ const PGManagement = () => {
     handleAddNew
   } = usePGDialogs();
 
-  // Load data when component mounts or user changes
-  useEffect(() => {
-    if (user && user.id) {
-      console.log("PGManagement: User authenticated, ensuring data is loaded for user:", user?.email, user?.role);
-      refreshAllData();
-    }
-  }, [user?.id, user?.role, refreshAllData]);
-
-  // Enhanced handlers that integrate with dialog management
-  const onAddPG = async (pg: Omit<PG, 'id'>): Promise<boolean> => {
-    try {
-      console.log("PGManagement: onAddPG called with:", pg);
-      
-      // Use the addPG function from DataContext which returns the created PG
-      await addPG(pg);
-      console.log("PGManagement: PG created successfully");
-      
-      setAddDialogOpen(false);
-      return true;
-      
-    } catch (error) {
-      console.error("PGManagement: Error in onAddPG:", error);
-      return false;
-    }
-  };
-
-  const onEditPG = async (pg: PG): Promise<boolean> => {
-    try {
-      console.log("PGManagement: onEditPG called with:", pg);
-      
-      await updatePG(pg);
-      console.log("PGManagement: PG updated successfully");
-      
-      setEditDialogOpen(false);
-      setSelectedPG(null);
-      return true;
-      
-    } catch (error) {
-      console.error("PGManagement: Error in onEditPG:", error);
-      return false;
-    }
-  };
-
-  const onDeletePG = async (pgId?: string): Promise<boolean> => {
-    const targetPgId = pgId || selectedPG?.id;
-    
-    if (!targetPgId) return false;
-    
-    try {
-      console.log("PGManagement: onDeletePG called for:", targetPgId);
-      
-      await deletePG(targetPgId);
-      console.log("PGManagement: PG deleted successfully");
-      
-      setDeleteDialogOpen(false);
-      setSelectedPG(null);
-      return true;
-      
-    } catch (error) {
-      console.error("PGManagement: Error in onDeletePG:", error);
-      return false;
-    }
-  };
-
-  // Filter PGs based on tab selection and search query
-  const filteredPGs = pgData.filter(pg => {
-    // Filter by tab
-    if (activeTab !== "all" && pg.type !== activeTab) return false;
-    
-    // Filter by search
-    if (searchQuery && !pg.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
-        !pg.location.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-    
-    return true;
+  const { onAddPG, onEditPG, onDeletePG } = usePGOperations({
+    addPG,
+    updatePG,
+    deletePG,
+    setAddDialogOpen,
+    setEditDialogOpen,
+    setDeleteDialogOpen,
+    setSelectedPG
   });
 
-  console.log("PGManagement: Rendering with", pgData.length, "total PGs,", filteredPGs.length, "filtered PGs");
+  console.log("PGManagement: Rendering with", filteredPGs.length, "filtered PGs");
 
   return (
     <div className="page-container space-y-6">
@@ -134,7 +58,6 @@ const PGManagement = () => {
         loading={loading}
       />
       
-      {/* Filters */}
       <div className="space-y-4">
         <div className="responsive-flex justify-between">
           <PGFilters 
@@ -146,7 +69,6 @@ const PGManagement = () => {
         </div>
       </div>
       
-      {/* PG Content */}
       <div className="mt-6">
         <PGTabContent 
           loading={loading}
@@ -159,7 +81,6 @@ const PGManagement = () => {
         />
       </div>
 
-      {/* All Dialogs */}
       <PGDialogManager
         addDialogOpen={addDialogOpen}
         setAddDialogOpen={setAddDialogOpen}
@@ -173,7 +94,7 @@ const PGManagement = () => {
         setSelectedPG={setSelectedPG}
         onAddPG={onAddPG}
         onEditPG={onEditPG}
-        onDeletePG={onDeletePG}
+        onDeletePG={(pgId) => onDeletePG(pgId, selectedPG)}
         onEditClick={handleEditClick}
         isProcessing={loading}
       />
