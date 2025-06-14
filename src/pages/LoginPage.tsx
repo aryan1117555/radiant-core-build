@@ -79,37 +79,44 @@ const LoginPage: React.FC = () => {
   // Create demo user if they don't exist
   const createDemoUserIfNeeded = async (email: string, password: string) => {
     try {
-      console.log('Checking if demo user exists:', email);
+      console.log('Creating demo user if needed:', email);
       
-      // Check if user exists in auth.users
-      const { data: { user: existingUser }, error: userError } = await supabase.auth.admin.getUserByEmail(email);
-      
-      if (!existingUser) {
-        console.log('Creating demo user:', email);
+      // First try to sign in - if it works, user exists
+      try {
+        await signIn(email, password);
+        console.log('Demo user already exists and login successful');
+        return;
+      } catch (loginError: any) {
+        console.log('Login failed, will try to create user:', loginError.message);
         
-        // Create user with admin privileges
-        const { data: userData, error: createError } = await supabase.auth.admin.createUser({
-          email,
-          password,
-          email_confirm: true,
-          user_metadata: { 
-            name: email.split('@')[0],
-            role: email.includes('admin') ? 'admin' : email.includes('manager') ? 'manager' : 'accountant'
+        // Only create user if login failed due to invalid credentials
+        if (loginError.message?.includes('Invalid login credentials')) {
+          console.log('Creating demo user:', email);
+          
+          // Create user with admin privileges
+          const { data: userData, error: createError } = await supabase.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+            user_metadata: { 
+              name: email.split('@')[0],
+              role: email.includes('admin') ? 'admin' : email.includes('manager') ? 'manager' : 'accountant'
+            }
+          });
+
+          if (createError) {
+            console.error('Error creating demo user:', createError);
+            throw createError;
           }
-        });
 
-        if (createError) {
-          console.error('Error creating demo user:', createError);
-          throw createError;
+          console.log('Demo user created successfully:', userData.user?.email);
+          
+          // Now try to sign in again
+          await signIn(email, password);
+        } else {
+          // Re-throw the original login error if it's not about invalid credentials
+          throw loginError;
         }
-
-        console.log('Demo user created successfully:', userData.user?.email);
-        
-        // Now try to sign in
-        await signIn(email, password);
-      } else {
-        console.log('Demo user already exists, attempting login');
-        await signIn(email, password);
       }
     } catch (error) {
       console.error('Error in createDemoUserIfNeeded:', error);
