@@ -44,36 +44,69 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Clear all caches and reset state
+  const clearAuthCache = () => {
+    console.log('AuthProvider: Clearing all auth cache');
+    setUser(null);
+    localStorage.removeItem('demo-students');
+    sessionStorage.clear();
+    
+    // Clear any stale session cookies
+    document.cookie.split(";").forEach((c) => {
+      const eqPos = c.indexOf("=");
+      const name = eqPos > -1 ? c.substr(0, eqPos) : c;
+      document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+    });
+  };
+
   useEffect(() => {
     console.log('AuthProvider: Initializing...');
     
-    // Get initial session
+    // Get initial session with better error handling
     const getInitialSession = async () => {
       try {
+        // First check if we have a valid session
         const { data: { session }, error } = await supabase.auth.getSession();
         console.log('AuthProvider: Initial session check:', { 
           session: session?.user?.email, 
-          error 
+          error: error?.message 
         });
         
         if (error) {
           console.error('AuthProvider: Session error:', error);
-        } else if (session?.user) {
-          // Enhance user with metadata and sync with users table
-          const enhancedUser = await enhanceUserWithMetadata(session.user);
-          setUser(enhancedUser);
-          
-          // Create session tracking
-          await SessionService.createSession(session.user.id);
-        } else {
-          // Check if there's a valid session cookie
-          const validSession = await SessionService.validateSession();
-          if (!validSession) {
-            setUser(null);
+          clearAuthCache();
+          throw error;
+        } 
+        
+        if (session?.user) {
+          try {
+            // Validate session with SessionService
+            const validSession = await SessionService.validateSession();
+            if (!validSession) {
+              console.log('AuthProvider: Session validation failed, clearing cache');
+              clearAuthCache();
+              await supabase.auth.signOut();
+              return;
+            }
+
+            // Enhance user with metadata and sync with users table
+            const enhancedUser = await enhanceUserWithMetadata(session.user);
+            setUser(enhancedUser);
+            
+            // Create or validate session tracking
+            await SessionService.createSession(session.user.id);
+          } catch (enhanceError) {
+            console.error('AuthProvider: Error enhancing user:', enhanceError);
+            clearAuthCache();
+            await supabase.auth.signOut();
           }
+        } else {
+          // No session found, clear everything
+          clearAuthCache();
         }
       } catch (error) {
-        console.error('AuthProvider: Error getting session:', error);
+        console.error('AuthProvider: Critical error getting session:', error);
+        clearAuthCache();
       } finally {
         setLoading(false);
       }
@@ -81,27 +114,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     getInitialSession();
 
-    // Listen for auth changes
+    // Listen for auth changes with enhanced error handling
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('AuthProvider: Auth state changed:', event, session?.user?.email);
       
-      if (session?.user) {
-        const enhancedUser = await enhanceUserWithMetadata(session.user);
-        setUser(enhancedUser);
-        
-        // Create or validate session
-        if (event === 'SIGNED_IN') {
-          await SessionService.createSession(session.user.id);
+      try {
+        if (session?.user) {
+          const enhancedUser = await enhanceUserWithMetadata(session.user);
+          setUser(enhancedUser);
+          
+          // Create or validate session
+          if (event === 'SIGNED_IN') {
+            await SessionService.createSession(session.user.id);
+          }
+        } else {
+          clearAuthCache();
+          
+          // Invalidate session on sign out
+          if (event === 'SIGNED_OUT') {
+            await SessionService.invalidateSession();
+          }
         }
-      } else {
-        setUser(null);
-        
-        // Invalidate session on sign out
-        if (event === 'SIGNED_OUT') {
-          await SessionService.invalidateSession();
-        }
+      } catch (error) {
+        console.error('AuthProvider: Error in auth state change:', error);
+        clearAuthCache();
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => {
@@ -112,68 +151,105 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const enhanceUserWithMetadata = async (supabaseUser: SupabaseUser): Promise<User> => {
     try {
-      // Try to get user data from users table first
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', supabaseUser.id)
-        .single();
+      // Try to get user data from users table with retry logic
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (retryCount < maxRetries) {
+        try {
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', supabaseUser.id)
+            .single();
 
-      if (!error && userData) {
-        // User exists in users table, use that data
-        // Properly handle assignedPGs conversion from JSON to string array
-        const assignedPGs = Array.isArray(userData.assignedPGs) 
-          ? userData.assignedPGs 
-          : userData.assignedPGs 
-            ? JSON.parse(userData.assignedPGs as string) 
-            : [];
+          if (!error && userData) {
+            // User exists in users table, use that data
+            const assignedPGs = Array.isArray(userData.assignedPGs) 
+              ? userData.assignedPGs 
+              : userData.assignedPGs 
+                ? JSON.parse(userData.assignedPGs as string) 
+                : [];
 
-        return {
-          ...supabaseUser,
-          name: userData.name,
-          role: userData.role,
-          assignedPGs: assignedPGs,
-          status: userData.status,
-          lastLogin: userData.lastLogin
-        };
-      } else {
-        console.log('AuthProvider: User not found in users table, creating entry...');
-        // User doesn't exist in users table, create entry and use metadata
-        const metadata = supabaseUser.user_metadata || {};
-        const appMetadata = supabaseUser.app_metadata || {};
-        
-        const newUserData = {
-          id: supabaseUser.id,
-          email: supabaseUser.email || '',
-          name: metadata.name || metadata.full_name || supabaseUser.email?.split('@')[0] || 'User',
-          role: metadata.role || appMetadata.role || 'admin',
-          assignedPGs: metadata.assignedPGs || appMetadata.assignedPGs || [],
-          status: 'active',
-          lastLogin: new Date().toISOString()
-        };
-
-        // Insert into users table
-        const { data: insertedUser, error: insertError } = await supabase
-          .from('users')
-          .insert(newUserData)
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error('AuthProvider: Error creating user entry:', insertError);
-        } else {
-          console.log('AuthProvider: User entry created successfully');
+            return {
+              ...supabaseUser,
+              name: userData.name,
+              role: userData.role,
+              assignedPGs: assignedPGs,
+              status: userData.status,
+              lastLogin: userData.lastLogin
+            };
+          } else if (error?.code === 'PGRST116') {
+            // User not found, create entry
+            break;
+          } else {
+            throw error;
+          }
+        } catch (dbError) {
+          retryCount++;
+          console.warn(`AuthProvider: Database attempt ${retryCount} failed:`, dbError);
+          
+          if (retryCount >= maxRetries) {
+            throw dbError;
+          }
+          
+          // Wait before retry with exponential backoff
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
         }
-
-        return {
-          ...supabaseUser,
-          name: newUserData.name,
-          role: newUserData.role,
-          assignedPGs: newUserData.assignedPGs,
-          status: newUserData.status,
-          lastLogin: newUserData.lastLogin
-        };
       }
+
+      // User doesn't exist in users table, create entry
+      console.log('AuthProvider: User not found in users table, creating entry...');
+      const metadata = supabaseUser.user_metadata || {};
+      const appMetadata = supabaseUser.app_metadata || {};
+      
+      const newUserData = {
+        id: supabaseUser.id,
+        email: supabaseUser.email || '',
+        name: metadata.name || metadata.full_name || supabaseUser.email?.split('@')[0] || 'User',
+        role: metadata.role || appMetadata.role || 'admin',
+        assignedPGs: metadata.assignedPGs || appMetadata.assignedPGs || [],
+        status: 'active',
+        lastLogin: new Date().toISOString()
+      };
+
+      // Insert into users table with retry logic
+      let insertRetryCount = 0;
+      while (insertRetryCount < maxRetries) {
+        try {
+          const { data: insertedUser, error: insertError } = await supabase
+            .from('users')
+            .insert(newUserData)
+            .select()
+            .single();
+
+          if (!insertError) {
+            console.log('AuthProvider: User entry created successfully');
+            break;
+          } else {
+            throw insertError;
+          }
+        } catch (insertErr) {
+          insertRetryCount++;
+          console.warn(`AuthProvider: Insert attempt ${insertRetryCount} failed:`, insertErr);
+          
+          if (insertRetryCount >= maxRetries) {
+            console.error('AuthProvider: Failed to create user entry after retries');
+            break;
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, insertRetryCount) * 1000));
+        }
+      }
+
+      return {
+        ...supabaseUser,
+        name: newUserData.name,
+        role: newUserData.role,
+        assignedPGs: newUserData.assignedPGs,
+        status: newUserData.status,
+        lastLogin: newUserData.lastLogin
+      };
     } catch (error) {
       console.error('Error enhancing user with metadata:', error);
       // Fallback to basic user data
@@ -193,6 +269,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('AuthProvider: Attempting to sign in user:', email);
     
     try {
+      // Clear any existing cache before signin
+      clearAuthCache();
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
@@ -204,23 +283,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           status: error.status,
           name: error.name
         });
-        throw error;
+        
+        // Handle specific auth errors
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Invalid email or password. Please check your credentials and try again.');
+        } else if (error.message.includes('Email not confirmed')) {
+          throw new Error('Please check your email and click the confirmation link before signing in.');
+        } else if (error.message.includes('Too many requests')) {
+          throw new Error('Too many login attempts. Please wait a few minutes before trying again.');
+        } else {
+          throw new Error(`Login failed: ${error.message}`);
+        }
       }
 
       console.log('AuthProvider: Sign in successful for:', data.user?.email);
       
-      // Update lastLogin in users table
+      // Update lastLogin in users table with retry logic
       if (data.user) {
-        await supabase
-          .from('users')
-          .update({ lastLogin: new Date().toISOString() })
-          .eq('id', data.user.id);
+        try {
+          await supabase
+            .from('users')
+            .update({ lastLogin: new Date().toISOString() })
+            .eq('id', data.user.id);
+        } catch (updateError) {
+          console.warn('AuthProvider: Failed to update lastLogin:', updateError);
+          // Non-critical error, don't throw
+        }
         
         // Create session tracking
-        await SessionService.createSession(data.user.id);
+        try {
+          await SessionService.createSession(data.user.id);
+        } catch (sessionError) {
+          console.warn('AuthProvider: Failed to create session:', sessionError);
+          // Non-critical error, don't throw
+        }
       }
     } catch (error) {
       console.error('AuthProvider: Sign in failed:', error);
+      clearAuthCache();
       throw error;
     }
   };
@@ -228,15 +328,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signOut = async () => {
     console.log('AuthProvider: Signing out');
     
-    // Invalidate current session before auth sign out
-    await SessionService.invalidateSession();
+    try {
+      // Invalidate current session before auth sign out
+      await SessionService.invalidateSession();
+    } catch (sessionError) {
+      console.warn('AuthProvider: Failed to invalidate session:', sessionError);
+      // Continue with sign out even if session invalidation fails
+    }
     
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error('AuthProvider: Sign out error:', error);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('AuthProvider: Sign out error:', error);
+        throw new Error(`Sign out failed: ${error.message}`);
+      }
+      
+      // Clear cache after successful sign out
+      clearAuthCache();
+      console.log('AuthProvider: Sign out successful');
+    } catch (error) {
+      console.error('AuthProvider: Sign out failed:', error);
+      // Force clear cache even on error
+      clearAuthCache();
       throw error;
     }
-    console.log('AuthProvider: Sign out successful');
   };
 
   const createUser = async (email: string, password: string, name: string, role: string, assignedPGs: string[] = []): Promise<User> => {

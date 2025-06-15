@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Session {
@@ -16,6 +15,7 @@ export interface Session {
 export class SessionService {
   private static readonly SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
   private static readonly COOKIE_NAME = 'restay_session';
+  private static readonly MAX_RETRIES = 3;
 
   // Generate a secure session token
   private static generateSessionToken(): string {
@@ -28,14 +28,36 @@ export class SessionService {
   private static getClientInfo() {
     return {
       user_agent: navigator.userAgent,
-      // Note: IP address will be handled server-side in production
       ip_address: null
     };
   }
 
-  // Create a new session
+  // Retry wrapper for database operations
+  private static async retryOperation<T>(
+    operation: () => Promise<T>, 
+    operationName: string
+  ): Promise<T | null> {
+    for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        console.error(`SessionService: ${operationName} attempt ${attempt} failed:`, error);
+        
+        if (attempt === this.MAX_RETRIES) {
+          console.error(`SessionService: ${operationName} failed after ${this.MAX_RETRIES} attempts`);
+          return null;
+        }
+        
+        // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+      }
+    }
+    return null;
+  }
+
+  // Create a new session with retry logic
   static async createSession(userId: string): Promise<Session | null> {
-    try {
+    return this.retryOperation(async () => {
       const sessionToken = this.generateSessionToken();
       const expiresAt = new Date(Date.now() + this.SESSION_DURATION).toISOString();
       const clientInfo = this.getClientInfo();
@@ -53,27 +75,23 @@ export class SessionService {
         .single();
 
       if (error) {
-        console.error('Error creating session:', error);
-        return null;
+        throw error;
       }
 
       // Store session token in secure cookie
       this.setSessionCookie(sessionToken, expiresAt);
       
-      console.log('Session created successfully:', data.id);
+      console.log('SessionService: Session created successfully:', data.id);
       return {
         ...data,
         ip_address: data.ip_address as string | null
       };
-    } catch (error) {
-      console.error('Error in createSession:', error);
-      return null;
-    }
+    }, 'createSession');
   }
 
-  // Validate and refresh session
+  // Validate and refresh session with retry logic
   static async validateSession(): Promise<Session | null> {
-    try {
+    return this.retryOperation(async () => {
       const sessionToken = this.getSessionCookie();
       if (!sessionToken) {
         return null;
@@ -99,19 +117,15 @@ export class SessionService {
         ...data,
         ip_address: data.ip_address as string | null
       };
-    } catch (error) {
-      console.error('Error validating session:', error);
-      this.clearSessionCookie();
-      return null;
-    }
+    }, 'validateSession');
   }
 
-  // Extend session expiration
+  // Extend session expiration with retry logic
   static async extendSession(sessionId: string): Promise<void> {
-    try {
+    await this.retryOperation(async () => {
       const newExpiresAt = new Date(Date.now() + this.SESSION_DURATION).toISOString();
       
-      await supabase
+      const { error } = await supabase
         .from('sessions')
         .update({ 
           expires_at: newExpiresAt,
@@ -119,32 +133,39 @@ export class SessionService {
         })
         .eq('id', sessionId);
 
+      if (error) {
+        throw error;
+      }
+
       // Update cookie expiration
       const sessionToken = this.getSessionCookie();
       if (sessionToken) {
         this.setSessionCookie(sessionToken, newExpiresAt);
       }
-    } catch (error) {
-      console.error('Error extending session:', error);
-    }
+      
+      return true;
+    }, 'extendSession');
   }
 
-  // Invalidate session
+  // Invalidate session with retry logic
   static async invalidateSession(sessionToken?: string): Promise<void> {
-    try {
+    await this.retryOperation(async () => {
       const token = sessionToken || this.getSessionCookie();
-      if (!token) return;
+      if (!token) return true;
 
-      await supabase
+      const { error } = await supabase
         .from('sessions')
         .update({ is_active: false })
         .eq('session_token', token);
 
+      if (error) {
+        throw error;
+      }
+
       this.clearSessionCookie();
-      console.log('Session invalidated');
-    } catch (error) {
-      console.error('Error invalidating session:', error);
-    }
+      console.log('SessionService: Session invalidated');
+      return true;
+    }, 'invalidateSession');
   }
 
   // Get all active sessions for a user
@@ -190,23 +211,35 @@ export class SessionService {
 
   // Cookie management methods
   private static setSessionCookie(token: string, expiresAt: string): void {
-    const expires = new Date(expiresAt);
-    document.cookie = `${this.COOKIE_NAME}=${token}; expires=${expires.toUTCString()}; path=/; secure; samesite=strict`;
+    try {
+      const expires = new Date(expiresAt);
+      document.cookie = `${this.COOKIE_NAME}=${token}; expires=${expires.toUTCString()}; path=/; secure; samesite=strict`;
+    } catch (error) {
+      console.error('SessionService: Failed to set session cookie:', error);
+    }
   }
 
   private static getSessionCookie(): string | null {
-    const cookies = document.cookie.split(';');
-    for (let cookie of cookies) {
-      const [name, value] = cookie.trim().split('=');
-      if (name === this.COOKIE_NAME) {
-        return value;
+    try {
+      const cookies = document.cookie.split(';');
+      for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === this.COOKIE_NAME) {
+          return value;
+        }
       }
+    } catch (error) {
+      console.error('SessionService: Failed to get session cookie:', error);
     }
     return null;
   }
 
   private static clearSessionCookie(): void {
-    document.cookie = `${this.COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    try {
+      document.cookie = `${this.COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    } catch (error) {
+      console.error('SessionService: Failed to clear session cookie:', error);
+    }
   }
 
   // Clean up expired sessions (can be called periodically)
