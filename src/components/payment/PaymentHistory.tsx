@@ -53,9 +53,9 @@ const PaymentHistory: React.FC<PaymentHistoryProps> = ({
   };
 
   return (
-    <div>
-      <h4 className="font-medium mb-2">Transaction History</h4>
-      <div className="rounded-md border overflow-hidden">
+    <div className="space-y-4">
+      <h4 className="font-medium">Transaction History</h4>
+      <div className="border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>

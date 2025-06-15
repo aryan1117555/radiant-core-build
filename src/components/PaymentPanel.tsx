@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Student, PaymentMode } from '@/types';
 import { PaymentFormValues } from './payment/paymentFormSchema';
@@ -8,6 +9,7 @@ import StudentPaymentInfo from './payment/StudentPaymentInfo';
 import { formatIndianCurrency } from '@/utils/formatCurrency';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
+
 interface PaymentPanelProps {
   student: Student;
   onAddPayment: (studentId: string, payment: {
@@ -18,18 +20,15 @@ interface PaymentPanelProps {
   }) => void;
   disabled?: boolean;
 }
+
 const PaymentPanel: React.FC<PaymentPanelProps> = ({
   student,
   onAddPayment,
   disabled = false
 }) => {
-  const {
-    user
-  } = useAuth();
-  const {
-    pgs,
-    rooms
-  } = useData();
+  const { user } = useAuth();
+  const { pgs, rooms } = useData();
+  
   const totalPaid = student.payments.filter(payment => payment.approvalStatus === 'approved').reduce((sum, payment) => sum + payment.amount, 0);
   const pendingAmount = student.payments.filter(payment => payment.approvalStatus === 'pending').reduce((sum, payment) => sum + payment.amount, 0);
   const balanceRemaining = student.totalFees - totalPaid;
@@ -37,6 +36,7 @@ const PaymentPanel: React.FC<PaymentPanelProps> = ({
   // Find the PG and room information
   const studentPG = pgs.find(pg => pg.id === student.pgId);
   const studentRoom = rooms.find(room => room.id === student.roomId);
+  
   const handleSubmit = (data: PaymentFormValues) => {
     // Ensure all required fields are explicitly passed
     onAddPayment(student.id, {
@@ -46,10 +46,13 @@ const PaymentPanel: React.FC<PaymentPanelProps> = ({
       note: data.note || '' // Provide default empty string if note is undefined
     });
   };
+
   const showAddedBy = user?.role === 'admin' || user?.role === 'manager';
-  return <div className="flex flex-col h-full">
-      <div className="p-6 rounded-lg shadow-sm border space-y-6 bg-slate-950">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+
+  return (
+    <div className="space-y-6">
+      <div className="p-6 rounded-lg shadow-sm border bg-slate-950">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <h3 className="text-lg font-semibold">Payment Details - {student.name}</h3>
           <div className="flex flex-col sm:flex-row gap-2 text-sm text-muted-foreground">
             <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded">
@@ -61,22 +64,38 @@ const PaymentPanel: React.FC<PaymentPanelProps> = ({
           </div>
         </div>
         
-        <StudentPaymentInfo student={student} />
-        
-        <PaymentSummary totalFees={student.totalFees} deposit={student.deposit} totalPaid={totalPaid} balanceRemaining={balanceRemaining} formatAmount={formatIndianCurrency} pendingAmount={pendingAmount} />
-        
-        <PaymentHistory payments={student.payments} formatAmount={formatIndianCurrency} showApprovalStatus={true} showAddedBy={showAddedBy} />
-        
-        <div>
-          <h4 className="font-medium mb-4">Add Payment</h4>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-            <p className="text-sm text-blue-700">
-              <strong>Note:</strong> All payments require accountant verification before being approved.
-            </p>
+        <div className="space-y-6">
+          <StudentPaymentInfo student={student} />
+          
+          <PaymentSummary 
+            totalFees={student.totalFees} 
+            deposit={student.deposit} 
+            totalPaid={totalPaid} 
+            balanceRemaining={balanceRemaining} 
+            formatAmount={formatIndianCurrency} 
+            pendingAmount={pendingAmount} 
+          />
+          
+          <PaymentHistory 
+            payments={student.payments} 
+            formatAmount={formatIndianCurrency} 
+            showApprovalStatus={true} 
+            showAddedBy={showAddedBy} 
+          />
+          
+          <div className="space-y-4">
+            <h4 className="font-medium">Add Payment</h4>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-700">
+                <strong>Note:</strong> All payments require accountant verification before being approved.
+              </p>
+            </div>
+            <PaymentForm onSubmit={handleSubmit} disabled={disabled} />
           </div>
-          <PaymentForm onSubmit={handleSubmit} disabled={disabled} />
         </div>
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default PaymentPanel;
