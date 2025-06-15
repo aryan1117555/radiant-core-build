@@ -143,8 +143,8 @@ const PaymentsPage: React.FC = () => {
 
   if (pgs.length === 0) {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">Payments</h1>
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Payments</h1>
         <Card className="p-8 text-center">
           <BuildingIcon className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-lg font-semibold mb-2">No PGs Found</h3>
@@ -160,7 +160,7 @@ const PaymentsPage: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Payments Management</h1>
         
@@ -338,7 +338,7 @@ const PaymentsPage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="students" className="mt-6">
-          <div className="grid gap-6">
+          <div className="space-y-6">
             {filteredStudents.length === 0 ? (
               <Card className="p-8 text-center">
                 <UsersIcon className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
