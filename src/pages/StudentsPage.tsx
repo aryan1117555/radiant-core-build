@@ -278,7 +278,7 @@ const StudentsPage = () => {
   };
   const renderStudentsList = (studentsToRender: any[]) => {
     if (studentsToRender.length === 0) {
-      return <div className="bg-white rounded-lg shadow p-6 text-center">
+      return <div className="rounded-lg shadow p-6 text-center bg-slate-950">
           <p className="text-muted-foreground">No students found in this category.</p>
         </div>;
     }
