@@ -26,10 +26,18 @@ const StudentsPage = () => {
     roomNumber?: string;
     pgName?: string;
   })[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [initialLoad, setInitialLoad] = useState<boolean>(true);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // Cache for expensive computations
+  const [dataCache, setDataCache] = useState<{
+    roomMap?: Map<string, any>;
+    pgMap?: Map<string, any>;
+    lastUpdate?: number;
+  }>({});
 
   // Memoize helper function
   const isDemoStudent = useCallback((studentId: string): boolean => {
@@ -49,8 +57,33 @@ const StudentsPage = () => {
     return user?.role === 'admin';
   }, [user?.role]);
 
+  // Create optimized maps for lookups
+  const { roomMap, pgMap } = useMemo(() => {
+    const now = Date.now();
+    
+    // Use cached maps if they exist and are recent (less than 30 seconds old)
+    if (dataCache.roomMap && dataCache.pgMap && dataCache.lastUpdate && 
+        (now - dataCache.lastUpdate) < 30000) {
+      return { roomMap: dataCache.roomMap, pgMap: dataCache.pgMap };
+    }
+    
+    const newRoomMap = new Map(contextRooms.map(room => [room.id, room]));
+    const newPgMap = new Map(pgs.map(pg => [pg.id, pg]));
+    
+    // Update cache
+    setDataCache({
+      roomMap: newRoomMap,
+      pgMap: newPgMap,
+      lastUpdate: now
+    });
+    
+    return { roomMap: newRoomMap, pgMap: newPgMap };
+  }, [contextRooms, pgs, dataCache]);
+
   // Memoize filtered students for better performance
   const filteredStudents = useMemo(() => {
+    if (students.length === 0) return [];
+    
     const today = new Date();
     
     switch (activeTab) {
@@ -58,7 +91,7 @@ const StudentsPage = () => {
         return students.filter(student => new Date(student.endDate) > today);
       case "pending":
         return students.filter(student => {
-          const paid = student.payments.reduce((sum, payment) => sum + payment.amount, 0);
+          const paid = student.payments?.reduce((sum, payment) => sum + payment.amount, 0) || 0;
           return paid < student.totalFees;
         });
       case "archived":
@@ -73,81 +106,82 @@ const StudentsPage = () => {
     return viewStudentId ? students.find(student => student.id === viewStudentId) : null;
   }, [viewStudentId, students]);
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!user?.id) return;
-      
-      try {
-        setLoading(true);
-        let allStudents: Student[] = [];
-        let allRooms: any[] = [];
+  // Optimized data loading with caching
+  const loadStudentsData = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      setLoading(true);
+      let allStudents: Student[] = [];
 
-        if (user?.id?.startsWith('demo-')) {
-          // Use cached demo data
-          const demoStudents = JSON.parse(localStorage.getItem('demo-students') || '[]');
-          const roomStudents = contextRooms.flatMap(room => 
-            (room.students || []).map(student => ({
-              ...student,
-              roomId: room.id,
-              pgId: room.pgId
-            }))
-          );
-          
-          const studentMap = new Map();
-          [...demoStudents, ...roomStudents].forEach(student => {
-            studentMap.set(student.id, student);
-          });
-          
-          allStudents = Array.from(studentMap.values());
-          allRooms = contextRooms;
-        } else {
-          allStudents = await fetchStudents();
-          allRooms = await fetchRooms();
-        }
-
-        // Optimize room and PG lookup with Maps
-        const roomMap = new Map(allRooms.map(room => [room.id, room]));
-        const pgMap = new Map(pgs.map(pg => [pg.id, pg]));
-
-        const studentsWithRoomInfo = allStudents.map(student => {
-          const room = roomMap.get(student.roomId);
-          const pg = student.pgId ? pgMap.get(student.pgId) : null;
-          
-          return {
+      if (user?.id?.startsWith('demo-')) {
+        // Use cached demo data - no network call needed
+        const demoStudents = JSON.parse(localStorage.getItem('demo-students') || '[]');
+        const roomStudents = contextRooms.flatMap(room => 
+          (room.students || []).map(student => ({
             ...student,
-            roomNumber: room?.number || room?.room_number || 'N/A',
-            pgName: pg?.name || 'N/A',
-            pgId: pg?.id || student.pgId
-          };
+            roomId: room.id,
+            pgId: room.pgId
+          }))
+        );
+        
+        // Use Set for deduplication (faster than array methods)
+        const studentMap = new Map();
+        [...demoStudents, ...roomStudents].forEach(student => {
+          studentMap.set(student.id, student);
         });
-
-        // Apply role-based filtering
-        let filteredStudents = studentsWithRoomInfo;
-        if (user?.role === 'manager') {
-          const assignedPgIds = user.assignedPGs && Array.isArray(user.assignedPGs) && user.assignedPGs.length > 0
-            ? pgs.filter(pg => user.assignedPGs?.includes(pg.name)).map(pg => pg.id)
-            : pgs.filter(pg => pg.managerId === user.id).map(pg => pg.id);
-          
-          filteredStudents = studentsWithRoomInfo.filter(student => 
-            student.pgId && assignedPgIds.includes(student.pgId)
-          );
-        }
-
-        setStudents(filteredStudents);
-      } catch (error) {
-        console.error("Error loading students:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load students. Please try again.",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
+        
+        allStudents = Array.from(studentMap.values());
+      } else {
+        // For real users, fetch from database only if needed
+        allStudents = await fetchStudents();
       }
-    };
 
-    loadData();
-  }, [pgs, toast, user, contextRooms]);
+      // Use pre-computed maps for faster lookups
+      const studentsWithRoomInfo = allStudents.map(student => {
+        const room = roomMap.get(student.roomId);
+        const pg = pgMap.get(student.pgId);
+        
+        return {
+          ...student,
+          roomNumber: room?.number || room?.room_number || 'N/A',
+          pgName: pg?.name || 'N/A',
+          pgId: pg?.id || student.pgId
+        };
+      });
+
+      // Apply role-based filtering efficiently
+      let filteredStudents = studentsWithRoomInfo;
+      if (user?.role === 'manager') {
+        const assignedPgIds = user.assignedPGs && Array.isArray(user.assignedPGs) && user.assignedPGs.length > 0
+          ? new Set(pgs.filter(pg => user.assignedPGs?.includes(pg.name)).map(pg => pg.id))
+          : new Set(pgs.filter(pg => pg.managerId === user.id).map(pg => pg.id));
+        
+        filteredStudents = studentsWithRoomInfo.filter(student => 
+          student.pgId && assignedPgIds.has(student.pgId)
+        );
+      }
+
+      setStudents(filteredStudents);
+    } catch (error) {
+      console.error("Error loading students:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load students. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+      setInitialLoad(false);
+    }
+  }, [user, roomMap, pgMap, contextRooms, pgs, toast]);
+
+  // Load data only when necessary
+  useEffect(() => {
+    if (!initialLoad && students.length > 0) return; // Skip if data already loaded
+    
+    loadStudentsData();
+  }, [loadStudentsData, initialLoad, students.length]);
 
   // Memoize handlers to prevent recreation
   const handleAddStudentClick = useCallback(() => {
@@ -236,15 +270,30 @@ const StudentsPage = () => {
     return format(new Date(date), 'dd/MM/yyyy');
   }, []);
 
-  // Render student item component for better performance
+  // Optimized student card component
   const StudentCard = React.memo(({ student, onView, onDelete }: { 
     student: any, 
     onView: (id: string) => void, 
     onDelete: (id: string) => void 
   }) => {
-    const paidAmount = (student.payments || []).reduce((sum: number, payment: any) => sum + payment.amount, 0);
-    const isPaid = paidAmount >= student.totalFees;
-    const isPartial = paidAmount > 0 && paidAmount < student.totalFees;
+    const paidAmount = useMemo(() => 
+      (student.payments || []).reduce((sum: number, payment: any) => sum + payment.amount, 0), 
+      [student.payments]
+    );
+    
+    const paymentStatus = useMemo(() => {
+      const isPaid = paidAmount >= student.totalFees;
+      const isPartial = paidAmount > 0 && paidAmount < student.totalFees;
+      
+      return {
+        isPaid,
+        isPartial,
+        className: isPaid ? 'bg-green-100 text-green-800' : 
+                   isPartial ? 'bg-yellow-100 text-yellow-800' : 
+                   'bg-red-100 text-red-800',
+        label: isPaid ? 'Paid' : isPartial ? 'Partial' : 'Unpaid'
+      };
+    }, [paidAmount, student.totalFees]);
 
     return (
       <div className="p-4 bg-slate-950">
@@ -253,12 +302,8 @@ const StudentsPage = () => {
             <h3 className="font-semibold text-white text-lg">{student.name}</h3>
             <p className="text-sm text-gray-300">{student.phone}</p>
           </div>
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-            isPaid ? 'bg-green-100 text-green-800' : 
-            isPartial ? 'bg-yellow-100 text-yellow-800' : 
-            'bg-red-100 text-red-800'
-          }`}>
-            {isPaid ? 'Paid' : isPartial ? 'Partial' : 'Unpaid'}
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${paymentStatus.className}`}>
+            {paymentStatus.label}
           </span>
         </div>
         
@@ -304,8 +349,9 @@ const StudentsPage = () => {
     );
   });
 
+  // Optimized tab content rendering
   const renderTabContent = useCallback(() => {
-    if (loading) {
+    if (loading && initialLoad) {
       return (
         <div className="rounded-lg shadow p-4 sm:p-6 text-center bg-slate-950">
           <p className="text-muted-foreground">Loading students...</p>
@@ -313,7 +359,7 @@ const StudentsPage = () => {
       );
     }
 
-    if (user?.role === 'manager' && students.length === 0) {
+    if (user?.role === 'manager' && students.length === 0 && !loading) {
       return (
         <div className="bg-white rounded-lg shadow p-4 sm:p-6 text-center">
           <p className="text-muted-foreground">No students found for your assigned PGs.</p>
@@ -321,7 +367,7 @@ const StudentsPage = () => {
       );
     }
 
-    if (filteredStudents.length === 0) {
+    if (filteredStudents.length === 0 && !loading) {
       return (
         <div className="rounded-lg shadow p-4 sm:p-6 text-center bg-slate-950">
           <p className="text-muted-foreground">No students found in this category.</p>
@@ -412,7 +458,7 @@ const StudentsPage = () => {
         </div>
       </div>
     );
-  }, [loading, user, students, filteredStudents, hasDeletePermission, handleViewStudent, handleDeleteStudent]);
+  }, [loading, initialLoad, user, students, filteredStudents, hasDeletePermission, handleViewStudent, handleDeleteStudent]);
 
   return (
     <div className="w-full">
