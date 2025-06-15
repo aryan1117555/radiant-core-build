@@ -20,17 +20,11 @@ const loginFormSchema = z.object({
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
 const LoginPage: React.FC = () => {
-  const {
-    user,
-    signIn,
-    loading
-  } = useAuth();
+  const { user, signIn, loading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -45,8 +39,10 @@ const LoginPage: React.FC = () => {
       email: data.email,
       passwordLength: data.password.length
     });
+    
     setLoginError(null);
     setIsSubmitting(true);
+    
     try {
       await signIn(data.email, data.password);
       console.log('Login successful');
@@ -56,6 +52,7 @@ const LoginPage: React.FC = () => {
       });
     } catch (error: any) {
       console.error('Login error details:', error);
+      
       let errorMessage = "Login failed. Please try again.";
       if (error.message) {
         if (error.message.includes('Invalid login credentials')) {
@@ -68,6 +65,7 @@ const LoginPage: React.FC = () => {
           errorMessage = error.message;
         }
       }
+      
       setLoginError(errorMessage);
       toast({
         title: "Authentication Failed",
@@ -79,36 +77,16 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const quickLogin = async (email: string, password: string = 'password') => {
-    setIsSubmitting(true);
-    setLoginError(null);
-    try {
-      await signIn(email, password);
-      toast({
-        title: "Login Successful",
-        description: "Welcome to the dashboard"
-      });
-    } catch (error: any) {
-      console.error('Quick login error:', error);
-      setLoginError(error.message || 'Quick login failed');
-      toast({
-        title: "Quick Login Failed",
-        description: error.message || 'Quick login failed',
-        variant: "destructive"
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Show minimal loading for faster perceived performance
+  // Show loading state
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
         <div className="flex items-center space-x-2">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-cyan-400" />
           <span className="text-cyan-300 font-medium">Loading...</span>
         </div>
-      </div>;
+      </div>
+    );
   }
 
   // Redirect if already logged in
@@ -141,7 +119,6 @@ const LoginPage: React.FC = () => {
       <div className="w-full max-w-md z-10">
         <Card className="border-slate-700 shadow-2xl bg-slate-800/90 backdrop-blur-md border-2">
           <CardHeader className="space-y-1 text-center relative">
-            {/* Creative header with geometric shapes */}
             <div className="flex justify-center mb-4 relative">
               <div className="relative">
                 <div className="w-16 h-16 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full flex items-center justify-center shadow-lg">
@@ -158,7 +135,6 @@ const LoginPage: React.FC = () => {
               Enter your credentials to access the dashboard
             </CardDescription>
 
-            {/* Decorative line */}
             <div className="flex items-center justify-center pt-2">
               <div className="h-0.5 w-16 bg-gradient-to-r from-transparent via-cyan-400 to-transparent"></div>
             </div>

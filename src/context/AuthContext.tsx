@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { SessionService } from '@/services/sessionService';
 
 // Extended User interface with custom properties
 export interface User extends SupabaseUser {
@@ -44,212 +43,63 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Clear all caches and reset state
-  const clearAuthCache = () => {
-    console.log('AuthProvider: Clearing all auth cache');
-    setUser(null);
-    localStorage.removeItem('demo-students');
-    sessionStorage.clear();
-    
-    // Clear any stale session cookies
-    document.cookie.split(";").forEach((c) => {
-      const eqPos = c.indexOf("=");
-      const name = eqPos > -1 ? c.substr(0, eqPos) : c;
-      document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
-    });
-  };
-
-  useEffect(() => {
-    console.log('AuthProvider: Initializing...');
-    
-    // Get initial session with better error handling
-    const getInitialSession = async () => {
-      try {
-        // First check if we have a valid session
-        const { data: { session }, error } = await supabase.auth.getSession();
-        console.log('AuthProvider: Initial session check:', { 
-          session: session?.user?.email, 
-          error: error?.message 
-        });
-        
-        if (error) {
-          console.error('AuthProvider: Session error:', error);
-          clearAuthCache();
-          throw error;
-        } 
-        
-        if (session?.user) {
-          try {
-            // Validate session with SessionService
-            const validSession = await SessionService.validateSession();
-            if (!validSession) {
-              console.log('AuthProvider: Session validation failed, clearing cache');
-              clearAuthCache();
-              await supabase.auth.signOut();
-              return;
-            }
-
-            // Enhance user with metadata and sync with users table
-            const enhancedUser = await enhanceUserWithMetadata(session.user);
-            setUser(enhancedUser);
-            
-            // Create or validate session tracking
-            await SessionService.createSession(session.user.id);
-          } catch (enhanceError) {
-            console.error('AuthProvider: Error enhancing user:', enhanceError);
-            clearAuthCache();
-            await supabase.auth.signOut();
-          }
-        } else {
-          // No session found, clear everything
-          clearAuthCache();
-        }
-      } catch (error) {
-        console.error('AuthProvider: Critical error getting session:', error);
-        clearAuthCache();
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getInitialSession();
-
-    // Listen for auth changes with enhanced error handling
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('AuthProvider: Auth state changed:', event, session?.user?.email);
-      
-      try {
-        if (session?.user) {
-          const enhancedUser = await enhanceUserWithMetadata(session.user);
-          setUser(enhancedUser);
-          
-          // Create or validate session
-          if (event === 'SIGNED_IN') {
-            await SessionService.createSession(session.user.id);
-          }
-        } else {
-          clearAuthCache();
-          
-          // Invalidate session on sign out
-          if (event === 'SIGNED_OUT') {
-            await SessionService.invalidateSession();
-          }
-        }
-      } catch (error) {
-        console.error('AuthProvider: Error in auth state change:', error);
-        clearAuthCache();
-      } finally {
-        setLoading(false);
-      }
-    });
-
-    return () => {
-      console.log('AuthProvider: Cleaning up subscription');
-      subscription?.unsubscribe();
-    };
-  }, []);
-
+  // Enhanced user creation from Supabase user
   const enhanceUserWithMetadata = async (supabaseUser: SupabaseUser): Promise<User> => {
     try {
-      // Try to get user data from users table with retry logic
-      let retryCount = 0;
-      const maxRetries = 3;
-      
-      while (retryCount < maxRetries) {
+      // Try to get user data from users table
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', supabaseUser.id)
+        .single();
+
+      if (!error && userData) {
+        // User exists in users table
+        const assignedPGs = Array.isArray(userData.assignedPGs) 
+          ? userData.assignedPGs 
+          : userData.assignedPGs 
+            ? JSON.parse(userData.assignedPGs as string) 
+            : [];
+
+        return {
+          ...supabaseUser,
+          name: userData.name,
+          role: userData.role,
+          assignedPGs: assignedPGs,
+          status: userData.status,
+          lastLogin: userData.lastLogin
+        };
+      } else {
+        // User doesn't exist in users table, create entry
+        console.log('AuthProvider: Creating user entry in users table');
+        const metadata = supabaseUser.user_metadata || {};
+        
+        const newUserData = {
+          id: supabaseUser.id,
+          email: supabaseUser.email || '',
+          name: metadata.name || metadata.full_name || supabaseUser.email?.split('@')[0] || 'User',
+          role: metadata.role || 'admin',
+          assignedPGs: metadata.assignedPGs || [],
+          status: 'active',
+          lastLogin: new Date().toISOString()
+        };
+
         try {
-          const { data: userData, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', supabaseUser.id)
-            .single();
-
-          if (!error && userData) {
-            // User exists in users table, use that data
-            const assignedPGs = Array.isArray(userData.assignedPGs) 
-              ? userData.assignedPGs 
-              : userData.assignedPGs 
-                ? JSON.parse(userData.assignedPGs as string) 
-                : [];
-
-            return {
-              ...supabaseUser,
-              name: userData.name,
-              role: userData.role,
-              assignedPGs: assignedPGs,
-              status: userData.status,
-              lastLogin: userData.lastLogin
-            };
-          } else if (error?.code === 'PGRST116') {
-            // User not found, create entry
-            break;
-          } else {
-            throw error;
-          }
-        } catch (dbError) {
-          retryCount++;
-          console.warn(`AuthProvider: Database attempt ${retryCount} failed:`, dbError);
-          
-          if (retryCount >= maxRetries) {
-            throw dbError;
-          }
-          
-          // Wait before retry with exponential backoff
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+          await supabase.from('users').insert(newUserData);
+          console.log('AuthProvider: User entry created successfully');
+        } catch (insertError) {
+          console.warn('AuthProvider: Failed to create user entry:', insertError);
         }
+
+        return {
+          ...supabaseUser,
+          name: newUserData.name,
+          role: newUserData.role,
+          assignedPGs: newUserData.assignedPGs,
+          status: newUserData.status,
+          lastLogin: newUserData.lastLogin
+        };
       }
-
-      // User doesn't exist in users table, create entry
-      console.log('AuthProvider: User not found in users table, creating entry...');
-      const metadata = supabaseUser.user_metadata || {};
-      const appMetadata = supabaseUser.app_metadata || {};
-      
-      const newUserData = {
-        id: supabaseUser.id,
-        email: supabaseUser.email || '',
-        name: metadata.name || metadata.full_name || supabaseUser.email?.split('@')[0] || 'User',
-        role: metadata.role || appMetadata.role || 'admin',
-        assignedPGs: metadata.assignedPGs || appMetadata.assignedPGs || [],
-        status: 'active',
-        lastLogin: new Date().toISOString()
-      };
-
-      // Insert into users table with retry logic
-      let insertRetryCount = 0;
-      while (insertRetryCount < maxRetries) {
-        try {
-          const { data: insertedUser, error: insertError } = await supabase
-            .from('users')
-            .insert(newUserData)
-            .select()
-            .single();
-
-          if (!insertError) {
-            console.log('AuthProvider: User entry created successfully');
-            break;
-          } else {
-            throw insertError;
-          }
-        } catch (insertErr) {
-          insertRetryCount++;
-          console.warn(`AuthProvider: Insert attempt ${insertRetryCount} failed:`, insertErr);
-          
-          if (insertRetryCount >= maxRetries) {
-            console.error('AuthProvider: Failed to create user entry after retries');
-            break;
-          }
-          
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, insertRetryCount) * 1000));
-        }
-      }
-
-      return {
-        ...supabaseUser,
-        name: newUserData.name,
-        role: newUserData.role,
-        assignedPGs: newUserData.assignedPGs,
-        status: newUserData.status,
-        lastLogin: newUserData.lastLogin
-      };
     } catch (error) {
       console.error('Error enhancing user with metadata:', error);
       // Fallback to basic user data
@@ -265,24 +115,83 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  useEffect(() => {
+    console.log('AuthProvider: Initializing authentication...');
+    
+    // Get initial session
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      console.log('AuthProvider: Initial session check:', { 
+        session: session?.user?.email, 
+        error: error?.message 
+      });
+      
+      if (error) {
+        console.error('AuthProvider: Session error:', error);
+        setUser(null);
+      } else if (session?.user) {
+        try {
+          const enhancedUser = await enhanceUserWithMetadata(session.user);
+          setUser(enhancedUser);
+          console.log('AuthProvider: User authenticated:', enhancedUser.email);
+        } catch (enhanceError) {
+          console.error('AuthProvider: Error enhancing user:', enhanceError);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+      
+      setLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('AuthProvider: Auth state changed:', event, session?.user?.email);
+      
+      try {
+        if (session?.user) {
+          const enhancedUser = await enhanceUserWithMetadata(session.user);
+          setUser(enhancedUser);
+          
+          // Update lastLogin on sign in
+          if (event === 'SIGNED_IN') {
+            try {
+              await supabase
+                .from('users')
+                .update({ lastLogin: new Date().toISOString() })
+                .eq('id', session.user.id);
+            } catch (updateError) {
+              console.warn('AuthProvider: Failed to update lastLogin:', updateError);
+            }
+          }
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('AuthProvider: Error in auth state change:', error);
+        setUser(null);
+      }
+      
+      setLoading(false);
+    });
+
+    return () => {
+      console.log('AuthProvider: Cleaning up subscription');
+      subscription?.unsubscribe();
+    };
+  }, []);
+
   const signIn = async (email: string, password: string): Promise<void> => {
     console.log('AuthProvider: Attempting to sign in user:', email);
     
     try {
-      // Clear any existing cache before signin
-      clearAuthCache();
-      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
 
       if (error) {
-        console.error('AuthProvider: Sign in error:', {
-          message: error.message,
-          status: error.status,
-          name: error.name
-        });
+        console.error('AuthProvider: Sign in error:', error);
         
         // Handle specific auth errors
         if (error.message.includes('Invalid login credentials')) {
@@ -297,30 +206,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       console.log('AuthProvider: Sign in successful for:', data.user?.email);
-      
-      // Update lastLogin in users table with retry logic
-      if (data.user) {
-        try {
-          await supabase
-            .from('users')
-            .update({ lastLogin: new Date().toISOString() })
-            .eq('id', data.user.id);
-        } catch (updateError) {
-          console.warn('AuthProvider: Failed to update lastLogin:', updateError);
-          // Non-critical error, don't throw
-        }
-        
-        // Create session tracking
-        try {
-          await SessionService.createSession(data.user.id);
-        } catch (sessionError) {
-          console.warn('AuthProvider: Failed to create session:', sessionError);
-          // Non-critical error, don't throw
-        }
-      }
     } catch (error) {
       console.error('AuthProvider: Sign in failed:', error);
-      clearAuthCache();
       throw error;
     }
   };
@@ -329,27 +216,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('AuthProvider: Signing out');
     
     try {
-      // Invalidate current session before auth sign out
-      await SessionService.invalidateSession();
-    } catch (sessionError) {
-      console.warn('AuthProvider: Failed to invalidate session:', sessionError);
-      // Continue with sign out even if session invalidation fails
-    }
-    
-    try {
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('AuthProvider: Sign out error:', error);
         throw new Error(`Sign out failed: ${error.message}`);
       }
       
-      // Clear cache after successful sign out
-      clearAuthCache();
+      // Clear user state
+      setUser(null);
       console.log('AuthProvider: Sign out successful');
     } catch (error) {
       console.error('AuthProvider: Sign out failed:', error);
-      // Force clear cache even on error
-      clearAuthCache();
+      // Force clear user state even on error
+      setUser(null);
       throw error;
     }
   };
@@ -358,8 +237,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('Creating user with client-side approach:', { email, name, role });
       
-      // Since we can't use admin.createUser on client side, we'll create a regular signup
-      // and then update the user data in our users table
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -381,9 +258,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('User creation failed - no user data returned');
       }
 
-      console.log('User created in auth successfully:', authData.user.id);
-
-      // Create entry in users table
       const newUserData = {
         id: authData.user.id,
         email: authData.user.email!,
@@ -402,11 +276,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (userError) {
         console.error('Error creating user in users table:', userError);
-        // If users table insert fails, we should clean up the auth user
-        // But for now, we'll just log the error and continue
       }
-
-      console.log('User created successfully in both auth and users table');
 
       return {
         id: authData.user.id,
@@ -416,7 +286,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         assignedPGs: newUserData.assignedPGs,
         status: newUserData.status,
         lastLogin: newUserData.lastLogin,
-        // Add required Supabase User properties
         aud: 'authenticated',
         created_at: authData.user.created_at,
         app_metadata: authData.user.app_metadata || {},
@@ -453,7 +322,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (error) throw error;
 
-      // Properly handle assignedPGs conversion from JSON to string array
       const assignedPGs = Array.isArray(data.assignedPGs) 
         ? data.assignedPGs 
         : data.assignedPGs 
@@ -468,7 +336,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         assignedPGs: assignedPGs,
         status: data.status,
         lastLogin: data.lastLogin,
-        // Add required Supabase User properties
         aud: 'authenticated',
         created_at: data.created_at,
         app_metadata: {},
@@ -488,8 +355,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const deleteUser = async (id: string): Promise<void> => {
     try {
-      // For client-side, we can only delete from users table
-      // Auth user deletion requires admin privileges
       const { error: userError } = await supabase
         .from('users')
         .delete()
@@ -516,9 +381,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (error) throw error;
       
-      // Transform database users to User interface
       return (data || []).map(dbUser => {
-        // Properly handle assignedPGs conversion from JSON to string array
         const assignedPGs = Array.isArray(dbUser.assignedPGs) 
           ? dbUser.assignedPGs 
           : dbUser.assignedPGs 
@@ -533,7 +396,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           assignedPGs: assignedPGs,
           status: dbUser.status,
           lastLogin: dbUser.lastLogin,
-          // Add required Supabase User properties with defaults
           aud: 'authenticated',
           created_at: dbUser.created_at || new Date().toISOString(),
           app_metadata: {},
