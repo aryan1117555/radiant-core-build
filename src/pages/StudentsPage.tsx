@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useData } from '@/context/DataContext';
 import { Button } from '@/components/ui/button';
 import PageTabs from '@/components/PageTabs';
@@ -11,12 +12,14 @@ import { fetchRooms } from '@/services/roomService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Trash2 } from 'lucide-react';
+
 const StudentsPage = () => {
   const {
     pgs,
     rooms: contextRooms,
     clearAllStudents
   } = useData();
+  
   const [activeTab, setActiveTab] = useState("all");
   const [viewStudentId, setViewStudentId] = useState<string | null>(null);
   const [students, setStudents] = useState<(Student & {
@@ -25,48 +28,91 @@ const StudentsPage = () => {
   })[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const navigate = useNavigate();
-  const {
-    toast
-  } = useToast();
-  const {
-    user
-  } = useAuth();
+  const { toast } = useToast();
+  const { user } = useAuth();
 
-  // Helper function to check if a student is a demo student
-  const isDemoStudent = (studentId: string): boolean => {
+  // Memoize helper function
+  const isDemoStudent = useCallback((studentId: string): boolean => {
     return studentId.startsWith('student-') && /^student-\d+$/.test(studentId);
-  };
+  }, []);
+
+  // Memoize tabs to prevent recreation
+  const tabs = useMemo(() => [
+    { id: "all", label: "All Students" },
+    { id: "active", label: "Active" },
+    { id: "pending", label: "Pending Payments" },
+    { id: "archived", label: "Archived" }
+  ], []);
+
+  // Memoize permission check
+  const hasDeletePermission = useMemo(() => {
+    return user?.role === 'admin';
+  }, [user?.role]);
+
+  // Memoize filtered students for better performance
+  const filteredStudents = useMemo(() => {
+    const today = new Date();
+    
+    switch (activeTab) {
+      case "active":
+        return students.filter(student => new Date(student.endDate) > today);
+      case "pending":
+        return students.filter(student => {
+          const paid = student.payments.reduce((sum, payment) => sum + payment.amount, 0);
+          return paid < student.totalFees;
+        });
+      case "archived":
+        return students.filter(student => new Date(student.endDate) <= today);
+      default:
+        return students;
+    }
+  }, [students, activeTab]);
+
+  // Memoize viewing student
+  const viewingStudent = useMemo(() => {
+    return viewStudentId ? students.find(student => student.id === viewStudentId) : null;
+  }, [viewStudentId, students]);
+
   useEffect(() => {
     const loadData = async () => {
+      if (!user?.id) return;
+      
       try {
         setLoading(true);
         let allStudents: Student[] = [];
         let allRooms: any[] = [];
+
         if (user?.id?.startsWith('demo-')) {
-          console.log('Loading demo data from context...');
+          // Use cached demo data
           const demoStudents = JSON.parse(localStorage.getItem('demo-students') || '[]');
-          console.log('Demo students from localStorage:', demoStudents);
-          const roomStudents = contextRooms.flatMap(room => (room.students || []).map(student => ({
-            ...student,
-            roomId: room.id,
-            pgId: room.pgId
-          })));
-          let allDemoStudents = [...demoStudents];
-          roomStudents.forEach(roomStudent => {
-            if (!allDemoStudents.find(s => s.id === roomStudent.id)) {
-              allDemoStudents.push(roomStudent);
-            }
+          const roomStudents = contextRooms.flatMap(room => 
+            (room.students || []).map(student => ({
+              ...student,
+              roomId: room.id,
+              pgId: room.pgId
+            }))
+          );
+          
+          const studentMap = new Map();
+          [...demoStudents, ...roomStudents].forEach(student => {
+            studentMap.set(student.id, student);
           });
-          allStudents = allDemoStudents;
+          
+          allStudents = Array.from(studentMap.values());
           allRooms = contextRooms;
-          console.log('All demo students found:', allStudents);
         } else {
           allStudents = await fetchStudents();
           allRooms = await fetchRooms();
         }
+
+        // Optimize room and PG lookup with Maps
+        const roomMap = new Map(allRooms.map(room => [room.id, room]));
+        const pgMap = new Map(pgs.map(pg => [pg.id, pg]));
+
         const studentsWithRoomInfo = allStudents.map(student => {
-          const room = allRooms.find(room => room.id === student.roomId);
-          const pg = student.pgId ? pgs.find(p => p.id === student.pgId) : null;
+          const room = roomMap.get(student.roomId);
+          const pg = student.pgId ? pgMap.get(student.pgId) : null;
+          
           return {
             ...student,
             roomNumber: room?.number || room?.room_number || 'N/A',
@@ -74,18 +120,20 @@ const StudentsPage = () => {
             pgId: pg?.id || student.pgId
           };
         });
+
+        // Apply role-based filtering
         let filteredStudents = studentsWithRoomInfo;
-        if (user && user.role === 'manager') {
-          let assignedPgIds: string[] = [];
-          if (user.assignedPGs && Array.isArray(user.assignedPGs) && user.assignedPGs.length > 0) {
-            assignedPgIds = pgs.filter(pg => user.assignedPGs?.includes(pg.name)).map(pg => pg.id);
-          } else {
-            assignedPgIds = pgs.filter(pg => pg.managerId === user.id).map(pg => pg.id);
-          }
-          filteredStudents = studentsWithRoomInfo.filter(student => student.pgId && assignedPgIds.includes(student.pgId));
+        if (user?.role === 'manager') {
+          const assignedPgIds = user.assignedPGs && Array.isArray(user.assignedPGs) && user.assignedPGs.length > 0
+            ? pgs.filter(pg => user.assignedPGs?.includes(pg.name)).map(pg => pg.id)
+            : pgs.filter(pg => pg.managerId === user.id).map(pg => pg.id);
+          
+          filteredStudents = studentsWithRoomInfo.filter(student => 
+            student.pgId && assignedPgIds.includes(student.pgId)
+          );
         }
+
         setStudents(filteredStudents);
-        console.log("Loaded students for user:", filteredStudents.length, filteredStudents);
       } catch (error) {
         console.error("Error loading students:", error);
         toast({
@@ -97,61 +145,42 @@ const StudentsPage = () => {
         setLoading(false);
       }
     };
+
     loadData();
   }, [pgs, toast, user, contextRooms]);
-  const tabs = [{
-    id: "all",
-    label: "All Students"
-  }, {
-    id: "active",
-    label: "Active"
-  }, {
-    id: "pending",
-    label: "Pending Payments"
-  }, {
-    id: "archived",
-    label: "Archived"
-  }];
-  const viewingStudent = viewStudentId ? students.find(student => student.id === viewStudentId) : null;
-  const handleAddStudentClick = () => {
+
+  // Memoize handlers to prevent recreation
+  const handleAddStudentClick = useCallback(() => {
     navigate('/add-student');
-  };
-  const handleViewStudent = (studentId: string) => {
+  }, [navigate]);
+
+  const handleViewStudent = useCallback((studentId: string) => {
     setViewStudentId(studentId);
-  };
-  const handleCloseDialog = () => {
+  }, []);
+
+  const handleCloseDialog = useCallback(() => {
     setViewStudentId(null);
-  };
-  const handleDeleteStudent = async (studentId: string) => {
+  }, []);
+
+  const handleDeleteStudent = useCallback(async (studentId: string) => {
     try {
-      console.log("StudentsPage: Deleting student:", studentId);
       if (user?.id?.startsWith('demo-') || isDemoStudent(studentId)) {
-        console.log("Demo student detected, deleting from localStorage");
         const demoStudents = JSON.parse(localStorage.getItem('demo-students') || '[]');
         const updatedStudents = demoStudents.filter((s: any) => s.id !== studentId);
         localStorage.setItem('demo-students', JSON.stringify(updatedStudents));
-        setStudents(prevStudents => {
-          const filtered = prevStudents.filter(s => s.id !== studentId);
-          console.log("Local state updated, remaining students:", filtered.length);
-          return filtered;
-        });
-        console.log("Demo student deleted from localStorage and state updated");
+        
+        setStudents(prevStudents => prevStudents.filter(s => s.id !== studentId));
+        
         toast({
           title: "Success",
           description: "Student deleted successfully."
         });
       } else {
-        console.log("Real student detected, deleting from database");
-        const {
-          deleteStudent
-        } = await import('@/services/studentService');
+        const { deleteStudent } = await import('@/services/studentService');
         const success = await deleteStudent(studentId);
+        
         if (success) {
-          setStudents(prevStudents => {
-            const filtered = prevStudents.filter(s => s.id !== studentId);
-            console.log("Local state updated after DB deletion, remaining students:", filtered.length);
-            return filtered;
-          });
+          setStudents(prevStudents => prevStudents.filter(s => s.id !== studentId));
           toast({
             title: "Success",
             description: "Student deleted successfully."
@@ -168,28 +197,26 @@ const StudentsPage = () => {
         variant: "destructive"
       });
     }
-  };
-  const handleClearAllStudents = async () => {
+  }, [user, isDemoStudent, toast]);
+
+  const handleClearAllStudents = useCallback(async () => {
     if (!window.confirm("Are you sure you want to delete ALL students and their data? This action cannot be undone and will remove all student records and payment history.")) {
       return;
     }
+
     try {
-      console.log("Clearing all student data...");
       localStorage.removeItem('demo-students');
-      console.log("Demo students cleared from localStorage");
       setStudents([]);
+      
       if (!user?.id?.startsWith('demo-')) {
-        console.log("Clearing database student data...");
-        const {
-          clearAllStudentData
-        } = await import('@/services/studentService');
+        const { clearAllStudentData } = await import('@/services/studentService');
         const success = await clearAllStudentData();
         if (!success) {
           throw new Error("Failed to clear database student data");
         }
-        console.log("Database student data cleared successfully");
         await clearAllStudents();
       }
+      
       toast({
         title: "Success",
         description: "All student data has been cleared successfully."
@@ -202,100 +229,118 @@ const StudentsPage = () => {
         variant: "destructive"
       });
     }
-  };
-  const hasDeletePermission = () => {
-    return user?.role === 'admin';
-  };
-  const renderTabContent = () => {
+  }, [user, clearAllStudents, toast]);
+
+  // Memoize format date function
+  const formatDate = useCallback((date: Date) => {
+    return format(new Date(date), 'dd/MM/yyyy');
+  }, []);
+
+  // Render student item component for better performance
+  const StudentCard = React.memo(({ student, onView, onDelete }: { 
+    student: any, 
+    onView: (id: string) => void, 
+    onDelete: (id: string) => void 
+  }) => {
+    const paidAmount = (student.payments || []).reduce((sum: number, payment: any) => sum + payment.amount, 0);
+    const isPaid = paidAmount >= student.totalFees;
+    const isPartial = paidAmount > 0 && paidAmount < student.totalFees;
+
+    return (
+      <div className="p-4 bg-slate-950">
+        <div className="flex justify-between items-start mb-3">
+          <div>
+            <h3 className="font-semibold text-white text-lg">{student.name}</h3>
+            <p className="text-sm text-gray-300">{student.phone}</p>
+          </div>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+            isPaid ? 'bg-green-100 text-green-800' : 
+            isPartial ? 'bg-yellow-100 text-yellow-800' : 
+            'bg-red-100 text-red-800'
+          }`}>
+            {isPaid ? 'Paid' : isPartial ? 'Partial' : 'Unpaid'}
+          </span>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+          <div>
+            <span className="text-gray-400">Room:</span>
+            <span className="ml-1 text-white">{student.roomNumber}</span>
+          </div>
+          <div>
+            <span className="text-gray-400">PG:</span>
+            <span className="ml-1 text-white">{student.pgName}</span>
+          </div>
+          <div>
+            <span className="text-gray-400">Occupation:</span>
+            <span className="ml-1 text-white">{student.occupation}</span>
+          </div>
+          <div>
+            <span className="text-gray-400">Total Fees:</span>
+            <span className="ml-1 text-white">₹{student.totalFees.toLocaleString()}</span>
+          </div>
+        </div>
+        
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => onView(student.id)} className="flex-1">
+            View
+          </Button>
+          {hasDeletePermission && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="text-red-500 hover:text-red-600 border-red-200 hover:border-red-300"
+              onClick={() => {
+                if (window.confirm(`Are you sure you want to permanently delete ${student.name}? This action cannot be undone.`)) {
+                  onDelete(student.id);
+                }
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  });
+
+  const renderTabContent = useCallback(() => {
     if (loading) {
-      return <div className="rounded-lg shadow p-4 sm:p-6 text-center bg-slate-950">
+      return (
+        <div className="rounded-lg shadow p-4 sm:p-6 text-center bg-slate-950">
           <p className="text-muted-foreground">Loading students...</p>
-        </div>;
+        </div>
+      );
     }
+
     if (user?.role === 'manager' && students.length === 0) {
-      return <div className="bg-white rounded-lg shadow p-4 sm:p-6 text-center">
+      return (
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6 text-center">
           <p className="text-muted-foreground">No students found for your assigned PGs.</p>
-        </div>;
+        </div>
+      );
     }
-    switch (activeTab) {
-      case "all":
-        return renderStudentsList(students);
-      case "active":
-        return renderStudentsList(students.filter(student => {
-          const today = new Date();
-          return new Date(student.endDate) > today;
-        }));
-      case "pending":
-        return renderStudentsList(students.filter(student => {
-          const paid = student.payments.reduce((sum, payment) => sum + payment.amount, 0);
-          return paid < student.totalFees;
-        }));
-      case "archived":
-        return renderStudentsList(students.filter(student => {
-          const today = new Date();
-          return new Date(student.endDate) <= today;
-        }));
-      default:
-        return null;
-    }
-  };
-  const renderStudentsList = (studentsToRender: any[]) => {
-    if (studentsToRender.length === 0) {
-      return <div className="rounded-lg shadow p-4 sm:p-6 text-center bg-slate-950">
+
+    if (filteredStudents.length === 0) {
+      return (
+        <div className="rounded-lg shadow p-4 sm:p-6 text-center bg-slate-950">
           <p className="text-muted-foreground">No students found in this category.</p>
-        </div>;
+        </div>
+      );
     }
-    return <div className="bg-white rounded-lg shadow overflow-hidden">
+
+    return (
+      <div className="bg-white rounded-lg shadow overflow-hidden">
         {/* Mobile Card View */}
         <div className="block lg:hidden divide-y divide-gray-200">
-          {studentsToRender.map(student => {
-          const paidAmount = (student.payments || []).reduce((sum: number, payment: any) => sum + payment.amount, 0);
-          const isPaid = paidAmount >= student.totalFees;
-          const isPartial = paidAmount > 0 && paidAmount < student.totalFees;
-          return <div key={student.id} className="p-4 bg-slate-950">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 className="font-semibold text-white text-lg">{student.name}</h3>
-                    <p className="text-sm text-gray-300">{student.phone}</p>
-                  </div>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${isPaid ? 'bg-green-100 text-green-800' : isPartial ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
-                    {isPaid ? 'Paid' : isPartial ? 'Partial' : 'Unpaid'}
-                  </span>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-2 text-sm mb-3">
-                  <div>
-                    <span className="text-gray-400">Room:</span>
-                    <span className="ml-1 text-white">{student.roomNumber}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">PG:</span>
-                    <span className="ml-1 text-white">{student.pgName}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Occupation:</span>
-                    <span className="ml-1 text-white">{student.occupation}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Total Fees:</span>
-                    <span className="ml-1 text-white">₹{student.totalFees.toLocaleString()}</span>
-                  </div>
-                </div>
-                
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleViewStudent(student.id)} className="flex-1">
-                    View
-                  </Button>
-                  {hasDeletePermission() && <Button variant="outline" size="sm" className="text-red-500 hover:text-red-600 border-red-200 hover:border-red-300" onClick={() => {
-                if (window.confirm(`Are you sure you want to permanently delete ${student.name}? This action cannot be undone.`)) {
-                  handleDeleteStudent(student.id);
-                }
-              }}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>}
-                </div>
-              </div>;
-        })}
+          {filteredStudents.map(student => (
+            <StudentCard 
+              key={student.id}
+              student={student}
+              onView={handleViewStudent}
+              onDelete={handleDeleteStudent}
+            />
+          ))}
         </div>
 
         {/* Desktop Table View */}
@@ -315,11 +360,13 @@ const StudentsPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {studentsToRender.map(student => {
-              const paidAmount = (student.payments || []).reduce((sum: number, payment: any) => sum + payment.amount, 0);
-              const isPaid = paidAmount >= student.totalFees;
-              const isPartial = paidAmount > 0 && paidAmount < student.totalFees;
-              return <tr key={student.id}>
+              {filteredStudents.map(student => {
+                const paidAmount = (student.payments || []).reduce((sum: number, payment: any) => sum + payment.amount, 0);
+                const isPaid = paidAmount >= student.totalFees;
+                const isPartial = paidAmount > 0 && paidAmount < student.totalFees;
+                
+                return (
+                  <tr key={student.id}>
                     <td className="px-4 py-4 text-sm bg-gray-950">{student.name}</td>
                     <td className="px-4 py-4 text-sm bg-slate-950">{student.roomNumber}</td>
                     <td className="px-4 py-4 text-sm bg-gray-950">{student.pgName}</td>
@@ -328,7 +375,11 @@ const StudentsPage = () => {
                     <td className="px-4 py-4 text-sm bg-slate-950">₹{student.totalFees.toLocaleString()}</td>
                     <td className="px-4 py-4 text-sm bg-slate-950">₹{paidAmount.toLocaleString()}</td>
                     <td className="px-4 py-4 text-sm bg-slate-950">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${isPaid ? 'bg-green-100 text-green-800' : isPartial ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        isPaid ? 'bg-green-100 text-green-800' : 
+                        isPartial ? 'bg-yellow-100 text-yellow-800' : 
+                        'bg-red-100 text-red-800'
+                      }`}>
                         {isPaid ? 'Paid' : isPartial ? 'Partial' : 'Unpaid'}
                       </span>
                     </td>
@@ -337,33 +388,47 @@ const StudentsPage = () => {
                         <Button variant="outline" size="sm" onClick={() => handleViewStudent(student.id)}>
                           View
                         </Button>
-                        {hasDeletePermission() && <Button variant="outline" size="sm" className="text-red-500 hover:text-red-600 border-red-200 hover:border-red-300" onClick={() => {
-                      if (window.confirm(`Are you sure you want to permanently delete ${student.name}? This action cannot be undone.`)) {
-                        handleDeleteStudent(student.id);
-                      }
-                    }}>
+                        {hasDeletePermission && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-red-500 hover:text-red-600 border-red-200 hover:border-red-300"
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to permanently delete ${student.name}? This action cannot be undone.`)) {
+                                handleDeleteStudent(student.id);
+                              }
+                            }}
+                          >
                             <Trash2 className="h-4 w-4" />
-                          </Button>}
+                          </Button>
+                        )}
                       </div>
                     </td>
-                  </tr>;
-            })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-      </div>;
-  };
-  const formatDate = (date: Date) => {
-    return format(new Date(date), 'dd/MM/yyyy');
-  };
-  return <div className="w-full">
+      </div>
+    );
+  }, [loading, user, students, filteredStudents, hasDeletePermission, handleViewStudent, handleDeleteStudent]);
+
+  return (
+    <div className="w-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3">
         <h1 className="text-xl sm:text-2xl font-bold">Students</h1>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          {hasDeletePermission() && <Button variant="outline" className="text-red-500 hover:text-red-600 border-red-200 hover:border-red-300 w-full sm:w-auto" onClick={handleClearAllStudents}>
+          {hasDeletePermission && (
+            <Button 
+              variant="outline" 
+              className="text-red-500 hover:text-red-600 border-red-200 hover:border-red-300 w-full sm:w-auto"
+              onClick={handleClearAllStudents}
+            >
               <Trash2 className="h-4 w-4 mr-2" />
               Clear All Students
-            </Button>}
+            </Button>
+          )}
           <Button onClick={handleAddStudentClick} className="w-full sm:w-auto">
             Add New Student
           </Button>
@@ -381,7 +446,8 @@ const StudentsPage = () => {
             <DialogTitle className="text-lg sm:text-xl font-semibold">Student Details</DialogTitle>
           </DialogHeader>
           
-          {viewingStudent && <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          {viewingStudent && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <h3 className="text-base sm:text-lg font-semibold mb-3">Personal Information</h3>
                 <div className="space-y-2">
@@ -438,14 +504,17 @@ const StudentsPage = () => {
                 </div>
               </div>
               
-              {viewingStudent.address && <div className="col-span-1 lg:col-span-2">
+              {viewingStudent.address && (
+                <div className="col-span-1 lg:col-span-2">
                   <h3 className="text-base sm:text-lg font-semibold mb-2">Address</h3>
                   <p className="text-muted-foreground break-words">{viewingStudent.address}</p>
-                </div>}
+                </div>
+              )}
               
               <div className="col-span-1 lg:col-span-2">
                 <h3 className="text-base sm:text-lg font-semibold mb-3">Payment History</h3>
-                {viewingStudent.payments && viewingStudent.payments.length > 0 ? <div className="overflow-x-auto border rounded">
+                {viewingStudent.payments && viewingStudent.payments.length > 0 ? (
+                  <div className="overflow-x-auto border rounded">
                     <table className="min-w-full">
                       <thead className="bg-muted">
                         <tr>
@@ -456,15 +525,20 @@ const StudentsPage = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {viewingStudent.payments.map((payment: any, index: number) => <tr key={index}>
+                        {viewingStudent.payments.map((payment: any, index: number) => (
+                          <tr key={index}>
                             <td className="px-2 sm:px-4 py-2 text-sm">{formatDate(payment.date)}</td>
                             <td className="px-2 sm:px-4 py-2 text-sm">₹{payment.amount.toLocaleString()}</td>
                             <td className="px-2 sm:px-4 py-2 text-sm">{payment.mode}</td>
                             <td className="px-2 sm:px-4 py-2 text-sm">{payment.note || '-'}</td>
-                          </tr>)}
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
-                  </div> : <p className="text-muted-foreground">No payment records found.</p>}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">No payment records found.</p>
+                )}
               </div>
               
               <div className="col-span-1 lg:col-span-2 flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2">
@@ -474,19 +548,28 @@ const StudentsPage = () => {
                 <Button onClick={() => navigate(`/edit-student/${viewingStudent.id}`)} className="w-full sm:w-auto">
                   Edit Details
                 </Button>
-                {hasDeletePermission() && <Button variant="outline" className="text-red-500 hover:text-red-600 border-red-200 hover:border-red-300 w-full sm:w-auto" onClick={() => {
-              if (window.confirm(`Are you sure you want to permanently delete ${viewingStudent.name}? This action cannot be undone.`)) {
-                handleDeleteStudent(viewingStudent.id);
-                handleCloseDialog();
-              }
-            }}>
+                {hasDeletePermission && (
+                  <Button 
+                    variant="outline" 
+                    className="text-red-500 hover:text-red-600 border-red-200 hover:border-red-300 w-full sm:w-auto"
+                    onClick={() => {
+                      if (window.confirm(`Are you sure you want to permanently delete ${viewingStudent.name}? This action cannot be undone.`)) {
+                        handleDeleteStudent(viewingStudent.id);
+                        handleCloseDialog();
+                      }
+                    }}
+                  >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete Student
-                  </Button>}
+                  </Button>
+                )}
               </div>
-            </div>}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
-    </div>;
+    </div>
+  );
 };
+
 export default StudentsPage;
