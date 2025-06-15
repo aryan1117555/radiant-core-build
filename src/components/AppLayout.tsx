@@ -12,9 +12,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const isMobile = useIsMobile();
   
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
+    <div className="flex h-screen w-full bg-background">
       <AppSidebar />
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${
         isMobile ? 'ml-[70px]' : 'ml-[70px] lg:ml-[280px]'
       } w-full`}>
         <div className="h-16 border-b border-border/50 flex items-center justify-between px-3 sm:px-4 md:px-6 w-full bg-card/50 backdrop-blur-sm">
