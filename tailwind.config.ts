@@ -67,7 +67,7 @@ export default {
 					foreground: 'hsl(var(--card-foreground))'
 				},
 				sidebar: {
-					DEFAULT: '#00A2F3',
+					DEFAULT: '#0891b2',
 					foreground: 'hsl(var(--sidebar-foreground))',
 					primary: 'hsl(var(--sidebar-primary))',
 					'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
@@ -77,11 +77,36 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				status: {
-					empty: '#10b981',   // green
-					half: '#f59e0b',    // amber
-					full: '#ef4444',    // red
+					empty: '#06b6d4',   // cyan
+					half: '#0891b2',    // cyan-600
+					full: '#0e7490',    // cyan-700
 				},
-				restay: '#00A2F3',  // Updated from #635BFF to #00A2F3
+				restay: '#0891b2',  // Cold blue cyan
+				// Cold blue color palette
+				'ice': {
+					50: '#f0f9ff',
+					100: '#e0f2fe',
+					200: '#bae6fd',
+					300: '#7dd3fc',
+					400: '#38bdf8',
+					500: '#0891b2',
+					600: '#0e7490',
+					700: '#155e75',
+					800: '#164e63',
+					900: '#0c4a6e',
+				},
+				'frost': {
+					50: '#f8fafc',
+					100: '#f1f5f9',
+					200: '#e2e8f0',
+					300: '#cbd5e1',
+					400: '#94a3b8',
+					500: '#64748b',
+					600: '#475569',
+					700: '#334155',
+					800: '#1e293b',
+					900: '#0f172a',
+				}
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -117,11 +142,45 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'fade-in': {
+					'0%': {
+						opacity: '0',
+						transform: 'translateY(10px)'
+					},
+					'100%': {
+						opacity: '1',
+						transform: 'translateY(0)'
+					}
+				},
+				'shimmer': {
+					'0%': {
+						backgroundPosition: '-200% 0'
+					},
+					'100%': {
+						backgroundPosition: '200% 0'
+					}
+				},
+				'float': {
+					'0%, 100%': {
+						transform: 'translateY(0px)'
+					},
+					'50%': {
+						transform: 'translateY(-10px)'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'fade-in': 'fade-in 0.3s ease-out',
+				'shimmer': 'shimmer 2s linear infinite',
+				'float': 'float 3s ease-in-out infinite'
+			},
+			backgroundImage: {
+				'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+				'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
+				'cold-gradient': 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0f172a 100%)',
 			}
 		}
 	},
