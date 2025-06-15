@@ -11,6 +11,7 @@ import { fetchRooms } from '@/services/roomService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Trash2 } from 'lucide-react';
+
 const StudentsPage = () => {
   const {
     pgs,
@@ -25,17 +26,14 @@ const StudentsPage = () => {
   })[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const navigate = useNavigate();
-  const {
-    toast
-  } = useToast();
-  const {
-    user
-  } = useAuth();
+  const { toast } = useToast();
+  const { user } = useAuth();
 
   // Helper function to check if a student is a demo student
   const isDemoStudent = (studentId: string): boolean => {
     return studentId.startsWith('student-') && /^student-\d+$/.test(studentId);
   };
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -43,22 +41,17 @@ const StudentsPage = () => {
         let allStudents: Student[] = [];
         let allRooms: any[] = [];
 
-        // For demo users, create some sample data if none exists
         if (user?.id?.startsWith('demo-')) {
           console.log('Loading demo data from context...');
-
-          // Get students from localStorage first
           const demoStudents = JSON.parse(localStorage.getItem('demo-students') || '[]');
           console.log('Demo students from localStorage:', demoStudents);
 
-          // Also get students from rooms in context
           const roomStudents = contextRooms.flatMap(room => (room.students || []).map(student => ({
             ...student,
             roomId: room.id,
             pgId: room.pgId
           })));
 
-          // Combine and deduplicate students
           let allDemoStudents = [...demoStudents];
           roomStudents.forEach(roomStudent => {
             if (!allDemoStudents.find(s => s.id === roomStudent.id)) {
@@ -69,12 +62,10 @@ const StudentsPage = () => {
           allRooms = contextRooms;
           console.log('All demo students found:', allStudents);
         } else {
-          // For real users, fetch from database
           allStudents = await fetchStudents();
           allRooms = await fetchRooms();
         }
 
-        // Map room numbers and PG names to students
         const studentsWithRoomInfo = allStudents.map(student => {
           const room = allRooms.find(room => room.id === student.roomId);
           const pg = student.pgId ? pgs.find(p => p.id === student.pgId) : null;
@@ -86,7 +77,6 @@ const StudentsPage = () => {
           };
         });
 
-        // Filter students based on user role and assigned PGs
         let filteredStudents = studentsWithRoomInfo;
         if (user && user.role === 'manager') {
           let assignedPgIds: string[] = [];
@@ -112,6 +102,7 @@ const StudentsPage = () => {
     };
     loadData();
   }, [pgs, toast, user, contextRooms]);
+
   const tabs = [{
     id: "all",
     label: "All Students"
@@ -125,30 +116,31 @@ const StudentsPage = () => {
     id: "archived",
     label: "Archived"
   }];
+
   const viewingStudent = viewStudentId ? students.find(student => student.id === viewStudentId) : null;
+
   const handleAddStudentClick = () => {
     navigate('/add-student');
   };
+
   const handleViewStudent = (studentId: string) => {
     setViewStudentId(studentId);
   };
+
   const handleCloseDialog = () => {
     setViewStudentId(null);
   };
+
   const handleDeleteStudent = async (studentId: string) => {
     try {
       console.log("StudentsPage: Deleting student:", studentId);
 
-      // Check if this is a demo student or demo user
       if (user?.id?.startsWith('demo-') || isDemoStudent(studentId)) {
         console.log("Demo student detected, deleting from localStorage");
-
-        // For demo students, remove from localStorage
         const demoStudents = JSON.parse(localStorage.getItem('demo-students') || '[]');
         const updatedStudents = demoStudents.filter((s: any) => s.id !== studentId);
         localStorage.setItem('demo-students', JSON.stringify(updatedStudents));
 
-        // Update local state immediately
         setStudents(prevStudents => {
           const filtered = prevStudents.filter(s => s.id !== studentId);
           console.log("Local state updated, remaining students:", filtered.length);
@@ -160,14 +152,10 @@ const StudentsPage = () => {
           description: "Student deleted successfully."
         });
       } else {
-        // For real students, use the database service
         console.log("Real student detected, deleting from database");
-        const {
-          deleteStudent
-        } = await import('@/services/studentService');
+        const { deleteStudent } = await import('@/services/studentService');
         const success = await deleteStudent(studentId);
         if (success) {
-          // Update local state immediately
           setStudents(prevStudents => {
             const filtered = prevStudents.filter(s => s.id !== studentId);
             console.log("Local state updated after DB deletion, remaining students:", filtered.length);
@@ -191,7 +179,6 @@ const StudentsPage = () => {
     }
   };
 
-  // Function to clear all student data
   const handleClearAllStudents = async () => {
     if (!window.confirm("Are you sure you want to delete ALL students and their data? This action cannot be undone and will remove all student records and payment history.")) {
       return;
@@ -199,28 +186,19 @@ const StudentsPage = () => {
     try {
       console.log("Clearing all student data...");
 
-      // Always clear demo students from localStorage first
       localStorage.removeItem('demo-students');
       console.log("Demo students cleared from localStorage");
 
-      // Clear local state immediately
       setStudents([]);
 
-      // For non-demo users, also clear database data
       if (!user?.id?.startsWith('demo-')) {
         console.log("Clearing database student data...");
-
-        // Import and use the clearAllStudentData function directly
-        const {
-          clearAllStudentData
-        } = await import('@/services/studentService');
+        const { clearAllStudentData } = await import('@/services/studentService');
         const success = await clearAllStudentData();
         if (!success) {
           throw new Error("Failed to clear database student data");
         }
         console.log("Database student data cleared successfully");
-
-        // Also use the context function to ensure all data is cleared
         await clearAllStudents();
       }
       toast({
@@ -237,23 +215,23 @@ const StudentsPage = () => {
     }
   };
 
-  // Check if user has permission to delete students (only admin)
   const hasDeletePermission = () => {
     return user?.role === 'admin';
   };
+
   const renderTabContent = () => {
     if (loading) {
-      return <div className="bg-white rounded-lg shadow p-6 text-center">
+      return <div className="bg-white rounded-lg shadow p-4 sm:p-6 text-center">
           <p className="text-muted-foreground">Loading students...</p>
         </div>;
     }
 
-    // If manager has no assigned PGs or no students found
     if (user?.role === 'manager' && students.length === 0) {
-      return <div className="bg-white rounded-lg shadow p-6 text-center">
+      return <div className="bg-white rounded-lg shadow p-4 sm:p-6 text-center">
           <p className="text-muted-foreground">No students found for your assigned PGs.</p>
         </div>;
     }
+    
     switch (activeTab) {
       case "all":
         return renderStudentsList(students);
@@ -276,77 +254,175 @@ const StudentsPage = () => {
         return null;
     }
   };
+
   const renderStudentsList = (studentsToRender: any[]) => {
     if (studentsToRender.length === 0) {
-      return <div className="rounded-lg shadow p-6 text-center bg-slate-950">
+      return <div className="rounded-lg shadow p-4 sm:p-6 text-center bg-slate-950">
           <p className="text-muted-foreground">No students found in this category.</p>
         </div>;
     }
-    return <div className="bg-white rounded-lg shadow overflow-x-auto">
-        <table className="w-full bg-slate-950">
-          <thead className="bg-muted">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Room</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">PG</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Phone</th>
-              <th className="px-4 py-3 text-left text-sm font-medium hidden md:table-cell">Occupation</th>
-              <th className="px-4 py-3 text-left text-sm font-medium hidden lg:table-cell">Total Fees</th>
-              <th className="px-4 py-3 text-left text-sm font-medium hidden lg:table-cell">Paid Amount</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {studentsToRender.map(student => {
+
+    return (
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        {/* Mobile Card View */}
+        <div className="block lg:hidden divide-y divide-gray-200">
+          {studentsToRender.map(student => {
             const paidAmount = (student.payments || []).reduce((sum: number, payment: any) => sum + payment.amount, 0);
             const isPaid = paidAmount >= student.totalFees;
             const isPartial = paidAmount > 0 && paidAmount < student.totalFees;
-            return <tr key={student.id}>
-                  <td className="px-4 py-4 text-sm bg-gray-950">{student.name}</td>
-                  <td className="px-4 py-4 text-sm bg-slate-950">{student.roomNumber}</td>
-                  <td className="px-4 py-4 text-sm bg-gray-950">{student.pgName}</td>
-                  <td className="px-4 py-4 text-sm bg-slate-950">{student.phone}</td>
-                  <td className="px-4 py-4 text-sm hidden md:table-cell bg-slate-950">{student.occupation}</td>
-                  <td className="px-4 py-4 text-sm hidden lg:table-cell bg-slate-950">₹{student.totalFees.toLocaleString()}</td>
-                  <td className="px-4 py-4 text-sm hidden lg:table-cell bg-slate-950">₹{paidAmount.toLocaleString()}</td>
-                  <td className="px-4 py-4 text-sm bg-slate-950">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${isPaid ? 'bg-green-100 text-green-800' : isPartial ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
-                      {isPaid ? 'Paid' : isPartial ? 'Partial' : 'Unpaid'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 text-sm bg-slate-950">
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleViewStudent(student.id)}>
-                        View
-                      </Button>
-                      {hasDeletePermission() && <Button variant="outline" size="sm" className="text-red-500 hover:text-red-600 border-red-200 hover:border-red-300" onClick={() => {
-                    if (window.confirm(`Are you sure you want to permanently delete ${student.name}? This action cannot be undone.`)) {
-                      handleDeleteStudent(student.id);
-                    }
-                  }}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>}
-                    </div>
-                  </td>
-                </tr>;
+            
+            return (
+              <div key={student.id} className="p-4 bg-slate-950">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="font-semibold text-white text-lg">{student.name}</h3>
+                    <p className="text-sm text-gray-300">{student.phone}</p>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    isPaid ? 'bg-green-100 text-green-800' : 
+                    isPartial ? 'bg-yellow-100 text-yellow-800' : 
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {isPaid ? 'Paid' : isPartial ? 'Partial' : 'Unpaid'}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                  <div>
+                    <span className="text-gray-400">Room:</span>
+                    <span className="ml-1 text-white">{student.roomNumber}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">PG:</span>
+                    <span className="ml-1 text-white">{student.pgName}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Occupation:</span>
+                    <span className="ml-1 text-white">{student.occupation}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Total Fees:</span>
+                    <span className="ml-1 text-white">₹{student.totalFees.toLocaleString()}</span>
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => handleViewStudent(student.id)} className="flex-1">
+                    View
+                  </Button>
+                  {hasDeletePermission() && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-red-500 hover:text-red-600 border-red-200 hover:border-red-300"
+                      onClick={() => {
+                        if (window.confirm(`Are you sure you want to permanently delete ${student.name}? This action cannot be undone.`)) {
+                          handleDeleteStudent(student.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
           })}
-          </tbody>
-        </table>
-      </div>;
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden lg:block overflow-x-auto">
+          <table className="w-full bg-slate-950">
+            <thead className="bg-muted">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Room</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">PG</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Phone</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Occupation</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Total Fees</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Paid Amount</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {studentsToRender.map(student => {
+                const paidAmount = (student.payments || []).reduce((sum: number, payment: any) => sum + payment.amount, 0);
+                const isPaid = paidAmount >= student.totalFees;
+                const isPartial = paidAmount > 0 && paidAmount < student.totalFees;
+                
+                return (
+                  <tr key={student.id}>
+                    <td className="px-4 py-4 text-sm bg-gray-950">{student.name}</td>
+                    <td className="px-4 py-4 text-sm bg-slate-950">{student.roomNumber}</td>
+                    <td className="px-4 py-4 text-sm bg-gray-950">{student.pgName}</td>
+                    <td className="px-4 py-4 text-sm bg-slate-950">{student.phone}</td>
+                    <td className="px-4 py-4 text-sm bg-slate-950">{student.occupation}</td>
+                    <td className="px-4 py-4 text-sm bg-slate-950">₹{student.totalFees.toLocaleString()}</td>
+                    <td className="px-4 py-4 text-sm bg-slate-950">₹{paidAmount.toLocaleString()}</td>
+                    <td className="px-4 py-4 text-sm bg-slate-950">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        isPaid ? 'bg-green-100 text-green-800' : 
+                        isPartial ? 'bg-yellow-100 text-yellow-800' : 
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {isPaid ? 'Paid' : isPartial ? 'Partial' : 'Unpaid'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-sm bg-slate-950">
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleViewStudent(student.id)}>
+                          View
+                        </Button>
+                        {hasDeletePermission() && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-red-500 hover:text-red-600 border-red-200 hover:border-red-300"
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to permanently delete ${student.name}? This action cannot be undone.`)) {
+                                handleDeleteStudent(student.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
   };
+
   const formatDate = (date: Date) => {
     return format(new Date(date), 'dd/MM/yyyy');
   };
-  return <>
-      <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
-        <h1 className="text-2xl font-bold">Students</h1>
-        <div className="flex gap-2">
-          {hasDeletePermission() && <Button variant="outline" className="text-red-500 hover:text-red-600 border-red-200 hover:border-red-300" onClick={handleClearAllStudents}>
+
+  return (
+    <div className="w-full">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3">
+        <h1 className="text-xl sm:text-2xl font-bold">Students</h1>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          {hasDeletePermission() && (
+            <Button 
+              variant="outline" 
+              className="text-red-500 hover:text-red-600 border-red-200 hover:border-red-300 w-full sm:w-auto" 
+              onClick={handleClearAllStudents}
+            >
               <Trash2 className="h-4 w-4 mr-2" />
               Clear All Students
-            </Button>}
-          <Button onClick={handleAddStudentClick}>Add New Student</Button>
+            </Button>
+          )}
+          <Button onClick={handleAddStudentClick} className="w-full sm:w-auto">
+            Add New Student
+          </Button>
         </div>
       </div>
       
@@ -356,113 +432,135 @@ const StudentsPage = () => {
       
       {/* Student Details Dialog */}
       <Dialog open={Boolean(viewStudentId)} onOpenChange={handleCloseDialog}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">Student Details</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl font-semibold">Student Details</DialogTitle>
           </DialogHeader>
           
-          {viewingStudent && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {viewingStudent && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               <div>
-                <h3 className="text-lg font-semibold mb-3">Personal Information</h3>
+                <h3 className="text-base sm:text-lg font-semibold mb-3">Personal Information</h3>
                 <div className="space-y-2">
-                  <div className="flex justify-between">
+                  <div className="flex flex-col sm:flex-row sm:justify-between">
                     <span className="font-medium">Name:</span>
-                    <span>{viewingStudent.name}</span>
+                    <span className="sm:text-right">{viewingStudent.name}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex flex-col sm:flex-row sm:justify-between">
                     <span className="font-medium">Phone:</span>
-                    <span>{viewingStudent.phone}</span>
+                    <span className="sm:text-right">{viewingStudent.phone}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex flex-col sm:flex-row sm:justify-between">
                     <span className="font-medium">Occupation:</span>
-                    <span>{viewingStudent.occupation}</span>
+                    <span className="sm:text-right">{viewingStudent.occupation}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex flex-col sm:flex-row sm:justify-between">
                     <span className="font-medium">Aadhaar:</span>
-                    <span>XXXX XXXX {viewingStudent.aadhaarNumber ? viewingStudent.aadhaarNumber.slice(-4) : 'N/A'}</span>
+                    <span className="sm:text-right">XXXX XXXX {viewingStudent.aadhaarNumber ? viewingStudent.aadhaarNumber.slice(-4) : 'N/A'}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex flex-col sm:flex-row sm:justify-between">
                     <span className="font-medium">Room Number:</span>
-                    <span>{viewingStudent.roomNumber}</span>
+                    <span className="sm:text-right">{viewingStudent.roomNumber}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex flex-col sm:flex-row sm:justify-between">
                     <span className="font-medium">PG:</span>
-                    <span>{viewingStudent.pgName}</span>
+                    <span className="sm:text-right">{viewingStudent.pgName}</span>
                   </div>
                 </div>
               </div>
               
               <div>
-                <h3 className="text-lg font-semibold mb-3">Stay Information</h3>
+                <h3 className="text-base sm:text-lg font-semibold mb-3">Stay Information</h3>
                 <div className="space-y-2">
-                  <div className="flex justify-between">
+                  <div className="flex flex-col sm:flex-row sm:justify-between">
                     <span className="font-medium">Start Date:</span>
-                    <span>{formatDate(viewingStudent.startDate)}</span>
+                    <span className="sm:text-right">{formatDate(viewingStudent.startDate)}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex flex-col sm:flex-row sm:justify-between">
                     <span className="font-medium">End Date:</span>
-                    <span>{formatDate(viewingStudent.endDate)}</span>
+                    <span className="sm:text-right">{formatDate(viewingStudent.endDate)}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex flex-col sm:flex-row sm:justify-between">
                     <span className="font-medium">Total Fees:</span>
-                    <span>₹{viewingStudent.totalFees.toLocaleString()}</span>
+                    <span className="sm:text-right">₹{viewingStudent.totalFees.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex flex-col sm:flex-row sm:justify-between">
                     <span className="font-medium">Deposit:</span>
-                    <span>₹{viewingStudent.deposit.toLocaleString()}</span>
+                    <span className="sm:text-right">₹{viewingStudent.deposit.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex flex-col sm:flex-row sm:justify-between">
                     <span className="font-medium">Paid Amount:</span>
-                    <span>₹{viewingStudent.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0).toLocaleString()}</span>
+                    <span className="sm:text-right">₹{viewingStudent.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0).toLocaleString()}</span>
                   </div>
                 </div>
               </div>
               
-              {viewingStudent.address && <div className="col-span-1 md:col-span-2">
-                  <h3 className="text-lg font-semibold mb-2">Address</h3>
-                  <p className="text-muted-foreground">{viewingStudent.address}</p>
-                </div>}
+              {viewingStudent.address && (
+                <div className="col-span-1 lg:col-span-2">
+                  <h3 className="text-base sm:text-lg font-semibold mb-2">Address</h3>
+                  <p className="text-muted-foreground break-words">{viewingStudent.address}</p>
+                </div>
+              )}
               
-              <div className="col-span-1 md:col-span-2">
-                <h3 className="text-lg font-semibold mb-3">Payment History</h3>
-                {viewingStudent.payments && viewingStudent.payments.length > 0 ? <div className="overflow-x-auto border rounded">
+              <div className="col-span-1 lg:col-span-2">
+                <h3 className="text-base sm:text-lg font-semibold mb-3">Payment History</h3>
+                {viewingStudent.payments && viewingStudent.payments.length > 0 ? (
+                  <div className="overflow-x-auto border rounded">
                     <table className="min-w-full">
                       <thead className="bg-muted">
                         <tr>
-                          <th className="px-4 py-2 text-left">Date</th>
-                          <th className="px-4 py-2 text-left">Amount</th>
-                          <th className="px-4 py-2 text-left">Mode</th>
-                          <th className="px-4 py-2 text-left">Note</th>
+                          <th className="px-2 sm:px-4 py-2 text-left text-sm">Date</th>
+                          <th className="px-2 sm:px-4 py-2 text-left text-sm">Amount</th>
+                          <th className="px-2 sm:px-4 py-2 text-left text-sm">Mode</th>
+                          <th className="px-2 sm:px-4 py-2 text-left text-sm">Note</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {viewingStudent.payments.map((payment: any, index: number) => <tr key={index}>
-                            <td className="px-4 py-2">{formatDate(payment.date)}</td>
-                            <td className="px-4 py-2">₹{payment.amount.toLocaleString()}</td>
-                            <td className="px-4 py-2">{payment.mode}</td>
-                            <td className="px-4 py-2">{payment.note || '-'}</td>
-                          </tr>)}
+                        {viewingStudent.payments.map((payment: any, index: number) => (
+                          <tr key={index}>
+                            <td className="px-2 sm:px-4 py-2 text-sm">{formatDate(payment.date)}</td>
+                            <td className="px-2 sm:px-4 py-2 text-sm">₹{payment.amount.toLocaleString()}</td>
+                            <td className="px-2 sm:px-4 py-2 text-sm">{payment.mode}</td>
+                            <td className="px-2 sm:px-4 py-2 text-sm">{payment.note || '-'}</td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
-                  </div> : <p className="text-muted-foreground">No payment records found.</p>}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">No payment records found.</p>
+                )}
               </div>
               
-              <div className="col-span-1 md:col-span-2 flex justify-end space-x-2">
-                <Button variant="outline" onClick={handleCloseDialog}>Close</Button>
-                <Button onClick={() => navigate(`/edit-student/${viewingStudent.id}`)}>Edit Details</Button>
-                {hasDeletePermission() && <Button variant="outline" className="text-red-500 hover:text-red-600 border-red-200 hover:border-red-300" onClick={() => {
-              if (window.confirm(`Are you sure you want to permanently delete ${viewingStudent.name}? This action cannot be undone.`)) {
-                handleDeleteStudent(viewingStudent.id);
-                handleCloseDialog();
-              }
-            }}>
+              <div className="col-span-1 lg:col-span-2 flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2">
+                <Button variant="outline" onClick={handleCloseDialog} className="w-full sm:w-auto">
+                  Close
+                </Button>
+                <Button onClick={() => navigate(`/edit-student/${viewingStudent.id}`)} className="w-full sm:w-auto">
+                  Edit Details
+                </Button>
+                {hasDeletePermission() && (
+                  <Button 
+                    variant="outline" 
+                    className="text-red-500 hover:text-red-600 border-red-200 hover:border-red-300 w-full sm:w-auto"
+                    onClick={() => {
+                      if (window.confirm(`Are you sure you want to permanently delete ${viewingStudent.name}? This action cannot be undone.`)) {
+                        handleDeleteStudent(viewingStudent.id);
+                        handleCloseDialog();
+                      }
+                    }}
+                  >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete Student
-                  </Button>}
+                  </Button>
+                )}
               </div>
-            </div>}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
-    </>;
+    </div>
+  );
 };
+
 export default StudentsPage;

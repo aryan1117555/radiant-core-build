@@ -23,7 +23,6 @@ interface Backup {
   status: 'completed' | 'failed';
 }
 
-// Mock backup data for demonstration
 const mockBackups: Backup[] = [
   {
     id: '1',
@@ -81,13 +80,11 @@ const BackupRecovery = () => {
     setIsBackupInProgress(true);
     setBackupProgress(0);
     
-    // Simulate backup progress
     const interval = setInterval(() => {
       setBackupProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval);
           
-          // Add new backup to the list
           const newBackup: Backup = {
             id: Date.now().toString(),
             name: 'Manual Backup',
@@ -99,7 +96,6 @@ const BackupRecovery = () => {
           
           setBackups([newBackup, ...backups]);
           
-          // Show success toast after completion
           setTimeout(() => {
             setIsBackupInProgress(false);
             toast({
@@ -115,7 +111,6 @@ const BackupRecovery = () => {
     }, 500);
   };
   
-  // Restore function
   const handleRestore = (backup: Backup) => {
     setSelectedBackup(backup);
   };
@@ -125,7 +120,6 @@ const BackupRecovery = () => {
     
     setIsRestoring(true);
     
-    // Simulate restore process
     setTimeout(() => {
       setIsRestoring(false);
       toast({
@@ -135,7 +129,6 @@ const BackupRecovery = () => {
     }, 3000);
   };
   
-  // Download backup function
   const downloadBackup = (backup: Backup) => {
     toast({
       title: "Download Started",
@@ -143,7 +136,6 @@ const BackupRecovery = () => {
     });
   };
   
-  // Delete backup function
   const deleteBackup = (id: string) => {
     setBackups(backups.filter(backup => backup.id !== id));
     toast({
@@ -153,30 +145,30 @@ const BackupRecovery = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-4 sm:space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Database className="h-5 w-5" /> 
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Database className="h-4 w-4 sm:h-5 sm:w-5" /> 
             Backup & Recovery
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             Create backups and restore your system when needed
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 sm:space-y-6">
           {/* Manual Backup Section */}
-          <div className="flex flex-col md:flex-row justify-between gap-4 items-start">
-            <div className="space-y-2">
-              <h3 className="text-lg font-medium">Manual Backup</h3>
-              <p className="text-sm text-muted-foreground">
+          <div className="flex flex-col lg:flex-row justify-between gap-4 items-start">
+            <div className="space-y-2 flex-1">
+              <h3 className="text-base sm:text-lg font-medium">Manual Backup</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Create a full system backup including all PG data, students, and settings
               </p>
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 w-full lg:w-auto">
               {isBackupInProgress ? (
-                <div className="w-full md:w-64 space-y-2">
+                <div className="w-full lg:w-64 space-y-2">
                   <Progress value={backupProgress} />
                   <p className="text-xs text-center text-muted-foreground">
                     {backupProgress}% Complete
@@ -185,14 +177,14 @@ const BackupRecovery = () => {
               ) : (
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button>
+                    <Button className="w-full lg:w-auto">
                       <Database className="mr-2 h-4 w-4" /> Create Backup
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="max-w-md sm:max-w-lg">
                     <DialogHeader>
-                      <DialogTitle>Create System Backup</DialogTitle>
-                      <DialogDescription>
+                      <DialogTitle className="text-base sm:text-lg">Create System Backup</DialogTitle>
+                      <DialogDescription className="text-sm">
                         This will create a complete backup of your system data.
                       </DialogDescription>
                     </DialogHeader>
@@ -203,27 +195,28 @@ const BackupRecovery = () => {
                         <Input 
                           placeholder="Enter a name for this backup" 
                           defaultValue={`Manual Backup - ${format(new Date(), 'dd MMM yyyy')}`}
+                          className="text-sm"
                         />
                       </div>
                       
                       <div>
                         <label className="text-sm font-medium">Backup Description (Optional)</label>
-                        <Input placeholder="Enter a description for this backup" />
+                        <Input placeholder="Enter a description for this backup" className="text-sm" />
                       </div>
                       
-                      <div className="flex items-center gap-2 bg-muted/50 p-3 rounded-md">
-                        <AlertTriangle className="h-5 w-5 text-amber-500" />
-                        <p className="text-sm">
+                      <div className="flex items-start gap-2 bg-muted/50 p-3 rounded-md">
+                        <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs sm:text-sm">
                           Backups include all system data. The process may take a few minutes to complete.
                         </p>
                       </div>
                     </div>
                     
-                    <DialogFooter>
-                      <Button variant="outline" type="button" onClick={() => {}}>
+                    <DialogFooter className="flex-col sm:flex-row gap-2">
+                      <Button variant="outline" type="button" className="w-full sm:w-auto">
                         Cancel
                       </Button>
-                      <Button onClick={triggerManualBackup}>
+                      <Button onClick={triggerManualBackup} className="w-full sm:w-auto">
                         Start Backup
                       </Button>
                     </DialogFooter>
@@ -234,17 +227,17 @@ const BackupRecovery = () => {
           </div>
           
           {/* Scheduled Backup Section */}
-          <div className="border-t pt-6">
-            <div className="flex justify-between items-start mb-4">
-              <div className="space-y-2">
-                <h3 className="text-lg font-medium">Scheduled Backups</h3>
-                <p className="text-sm text-muted-foreground">
+          <div className="border-t pt-4 sm:pt-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start mb-4 gap-3">
+              <div className="space-y-2 flex-1">
+                <h3 className="text-base sm:text-lg font-medium">Scheduled Backups</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Configure automatic backups on a regular schedule
                 </p>
               </div>
               
-              <div className="flex items-center">
-                <span className="text-sm mr-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">
                   {isScheduledBackupEnabled ? 'Enabled' : 'Disabled'}
                 </span>
                 <Switch 
@@ -254,11 +247,11 @@ const BackupRecovery = () => {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">Frequency</label>
                 <Select defaultValue="daily">
-                  <SelectTrigger>
+                  <SelectTrigger className="text-sm">
                     <SelectValue placeholder="Select frequency" />
                   </SelectTrigger>
                   <SelectContent>
@@ -272,7 +265,7 @@ const BackupRecovery = () => {
               <div>
                 <label className="text-sm font-medium mb-2 block">Time</label>
                 <Select defaultValue="midnight">
-                  <SelectTrigger>
+                  <SelectTrigger className="text-sm">
                     <SelectValue placeholder="Select time" />
                   </SelectTrigger>
                   <SelectContent>
@@ -288,7 +281,7 @@ const BackupRecovery = () => {
               <div>
                 <label className="text-sm font-medium mb-2 block">Keep Backups</label>
                 <Select defaultValue="30">
-                  <SelectTrigger>
+                  <SelectTrigger className="text-sm">
                     <SelectValue placeholder="Select period" />
                   </SelectTrigger>
                   <SelectContent>
@@ -303,7 +296,7 @@ const BackupRecovery = () => {
             </div>
             
             <Button 
-              className="mt-4" 
+              className="mt-4 w-full sm:w-auto" 
               variant="outline"
               onClick={() => {
                 toast({
@@ -320,141 +313,243 @@ const BackupRecovery = () => {
       
       {/* Backup History */}
       <Card>
-        <CardHeader>
-          <CardTitle>Backup History</CardTitle>
-          <CardDescription>
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="text-base sm:text-lg">Backup History</CardTitle>
+          <CardDescription className="text-sm">
             View and manage your previous system backups
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Size</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {backups.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
-                      No backups available. Create a backup to get started.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  backups.map((backup) => (
-                    <TableRow key={backup.id}>
-                      <TableCell className="font-medium">{backup.name}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>{format(backup.timestamp, 'dd MMM yyyy, HH:mm')}</span>
+        <CardContent className="p-0 sm:p-6">
+          {/* Mobile Card View */}
+          <div className="block lg:hidden px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="space-y-3">
+              {backups.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No backups available. Create a backup to get started.
+                </div>
+              ) : (
+                backups.map((backup) => (
+                  <div key={backup.id} className="border rounded-lg p-3 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-medium text-sm truncate">{backup.name}</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            {format(backup.timestamp, 'dd MMM yyyy, HH:mm')}
+                          </span>
                         </div>
-                      </TableCell>
-                      <TableCell>{backup.size}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          backup.type === 'manual' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                        }`}>
-                          {backup.type === 'manual' ? 'Manual' : 'Scheduled'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          backup.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {backup.status === 'completed' ? 
-                            <><CheckCircle2 className="h-3 w-3" /> Completed</> : 
-                            <><AlertTriangle className="h-3 w-3" /> Failed</>}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                      </div>
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                        backup.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        {backup.status === 'completed' ? 
+                          <><CheckCircle2 className="h-3 w-3" /> Completed</> : 
+                          <><AlertTriangle className="h-3 w-3" /> Failed</>}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center text-xs text-muted-foreground">
+                      <span>Size: {backup.size}</span>
+                      <span className={`px-2 py-1 rounded-full ${
+                        backup.type === 'manual' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                      }`}>
+                        {backup.type === 'manual' ? 'Manual' : 'Scheduled'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => downloadBackup(backup)}
+                        disabled={backup.status !== 'completed'}
+                        className="flex-1 text-xs"
+                      >
+                        <Download className="h-3 w-3 mr-1" />
+                        Download
+                      </Button>
+                      
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
                           <Button
                             variant="outline"
-                            size="icon"
-                            onClick={() => downloadBackup(backup)}
+                            size="sm"
+                            onClick={() => handleRestore(backup)}
                             disabled={backup.status !== 'completed'}
+                            className="flex-1 text-xs text-amber-700 hover:text-amber-700 hover:bg-amber-50"
                           >
-                            <Download className="h-4 w-4" />
+                            <Upload className="h-3 w-3 mr-1" />
+                            Restore
                           </Button>
-                          
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => handleRestore(backup)}
-                                disabled={backup.status !== 'completed'}
-                                className="text-amber-700 hover:text-amber-700 hover:bg-amber-50"
-                              >
-                                <Upload className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Restore System</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will restore your system to the state from {format(backup.timestamp, 'dd MMM yyyy, HH:mm')}.
-                                  All current data will be replaced. This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel disabled={isRestoring}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={confirmRestore}
-                                  className="bg-amber-600 hover:bg-amber-700"
-                                  disabled={isRestoring}
-                                >
-                                  {isRestoring ? "Restoring..." : "Restore System"}
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                          
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => deleteBackup(backup.id)}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <AlertTriangle className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="max-w-md">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="text-base">Restore System</AlertDialogTitle>
+                            <AlertDialogDescription className="text-sm">
+                              This will restore your system to the state from {format(backup.timestamp, 'dd MMM yyyy, HH:mm')}.
+                              All current data will be replaced. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                            <AlertDialogCancel disabled={isRestoring} className="w-full sm:w-auto">Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={confirmRestore}
+                              className="bg-amber-600 hover:bg-amber-700 w-full sm:w-auto"
+                              disabled={isRestoring}
+                            >
+                              {isRestoring ? "Restoring..." : "Restore System"}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteBackup(backup.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <AlertTriangle className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden lg:block">
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-sm">Name</TableHead>
+                    <TableHead className="text-sm">Date</TableHead>
+                    <TableHead className="text-sm">Size</TableHead>
+                    <TableHead className="text-sm">Type</TableHead>
+                    <TableHead className="text-sm">Status</TableHead>
+                    <TableHead className="text-right text-sm">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {backups.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-24 text-center">
+                        No backups available. Create a backup to get started.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    backups.map((backup) => (
+                      <TableRow key={backup.id}>
+                        <TableCell className="font-medium">{backup.name}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span>{format(backup.timestamp, 'dd MMM yyyy, HH:mm')}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{backup.size}</TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            backup.type === 'manual' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                          }`}>
+                            {backup.type === 'manual' ? 'Manual' : 'Scheduled'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            backup.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {backup.status === 'completed' ? 
+                              <><CheckCircle2 className="h-3 w-3" /> Completed</> : 
+                              <><AlertTriangle className="h-3 w-3" /> Failed</>}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => downloadBackup(backup)}
+                              disabled={backup.status !== 'completed'}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => handleRestore(backup)}
+                                  disabled={backup.status !== 'completed'}
+                                  className="text-amber-700 hover:text-amber-700 hover:bg-amber-50"
+                                >
+                                  <Upload className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Restore System</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will restore your system to the state from {format(backup.timestamp, 'dd MMM yyyy, HH:mm')}.
+                                    All current data will be replaced. This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel disabled={isRestoring}>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={confirmRestore}
+                                    className="bg-amber-600 hover:bg-amber-700"
+                                    disabled={isRestoring}
+                                  >
+                                    {isRestoring ? "Restoring..." : "Restore System"}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                            
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => deleteBackup(backup.id)}
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <AlertTriangle className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </CardContent>
       </Card>
       
       {/* Upload Backup Section */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileUp className="h-5 w-5" />
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <FileUp className="h-4 w-4 sm:h-5 sm:w-5" />
             Upload Backup
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             Import a previously downloaded backup file
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="border-2 border-dashed border-muted-foreground/20 rounded-lg p-8 text-center">
-            <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">Upload a Backup File</h3>
-            <p className="text-sm text-muted-foreground mb-4">
+          <div className="border-2 border-dashed border-muted-foreground/20 rounded-lg p-6 sm:p-8 text-center">
+            <Upload className="h-8 w-8 sm:h-10 sm:w-10 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-base sm:text-lg font-medium mb-2">Upload a Backup File</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground mb-4">
               Drag and drop your backup file here, or click to browse
             </p>
-            <Button variant="outline">
+            <Button variant="outline" className="w-full sm:w-auto">
               Browse Files
             </Button>
           </div>
