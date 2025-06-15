@@ -13,8 +13,8 @@ interface RequestQueue {
 }
 
 export const useApiOptimization = <T = any>(cacheTime: number = 5 * 60 * 1000) => {
-  const cache = useRef(new Map<string, CacheEntry<T>>());
-  const pendingRequests = useRef(new Map<string, Promise<T>>());
+  const cache = useRef(new Map<string, CacheEntry<any>>());
+  const pendingRequests = useRef(new Map<string, Promise<any>>());
   const requestQueue = useRef(new Map<string, RequestQueue[]>());
   const lastRequestTime = useRef(new Map<string, number>());
   
@@ -32,7 +32,7 @@ export const useApiOptimization = <T = any>(cacheTime: number = 5 * 60 * 1000) =
     return Date.now() - lastTime >= RATE_LIMIT_MS;
   }, []);
 
-  const getCachedData = useCallback((key: string): T | null => {
+  const getCachedData = useCallback(<R = any>(key: string): R | null => {
     const entry = cache.current.get(key);
     if (!entry) return null;
     
@@ -41,10 +41,10 @@ export const useApiOptimization = <T = any>(cacheTime: number = 5 * 60 * 1000) =
       return null;
     }
     
-    return entry.data;
+    return entry.data as R;
   }, []);
 
-  const setCachedData = useCallback((key: string, data: T): void => {
+  const setCachedData = useCallback(<R = any>(key: string, data: R): void => {
     cache.current.set(key, {
       data,
       timestamp: Date.now(),
@@ -52,13 +52,13 @@ export const useApiOptimization = <T = any>(cacheTime: number = 5 * 60 * 1000) =
     });
   }, [cacheTime]);
 
-  const executeRequest = useCallback(async <R = T>(
+  const executeRequest = useCallback(async <R = any>(
     requestFn: () => Promise<R>,
     key: string
   ): Promise<R> => {
     try {
       const result = await requestFn();
-      setCachedData(key, result as unknown as T);
+      setCachedData(key, result);
       lastRequestTime.current.set(key, Date.now());
       
       // Resolve any queued requests with the same key
@@ -82,7 +82,7 @@ export const useApiOptimization = <T = any>(cacheTime: number = 5 * 60 * 1000) =
     }
   }, [setCachedData]);
 
-  const optimizedRequest = useCallback(async <R = T>(
+  const optimizedRequest = useCallback(async <R = any>(
     requestFn: () => Promise<R>,
     url: string,
     params?: any
@@ -90,9 +90,9 @@ export const useApiOptimization = <T = any>(cacheTime: number = 5 * 60 * 1000) =
     const key = getCacheKey(url, params);
     
     // Check cache first
-    const cachedData = getCachedData(key);
+    const cachedData = getCachedData<R>(key);
     if (cachedData) {
-      return cachedData as unknown as R;
+      return cachedData;
     }
     
     // Check if there's already a pending request for this key
@@ -112,7 +112,7 @@ export const useApiOptimization = <T = any>(cacheTime: number = 5 * 60 * 1000) =
         setTimeout(() => {
           if (!pendingRequests.current.has(key)) {
             const request = executeRequest(requestFn, key);
-            pendingRequests.current.set(key, request as Promise<T>);
+            pendingRequests.current.set(key, request);
           }
         }, RATE_LIMIT_MS);
       });
@@ -120,9 +120,9 @@ export const useApiOptimization = <T = any>(cacheTime: number = 5 * 60 * 1000) =
     
     // Execute the request
     const request = executeRequest(requestFn, key);
-    pendingRequests.current.set(key, request as Promise<T>);
+    pendingRequests.current.set(key, request);
     
-    return request as Promise<R>;
+    return request;
   }, [getCacheKey, getCachedData, isRequestAllowed, executeRequest]);
 
   const clearCache = useCallback((pattern?: string): void => {
