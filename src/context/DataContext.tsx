@@ -30,7 +30,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
   console.log("DataContext: Current user:", user?.email, user?.user_metadata?.role, user?.user_metadata?.assignedPGs);
 
-  // Use the optimized data loader hook instead of the old one
+  // Use the optimized data loader hook
   const {
     pgs,
     rooms,
@@ -51,43 +51,49 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const studentOperations = useStudentOperations(user, students, refreshAllData, loadAllData);
   const paymentOperations = usePaymentOperations(user, refreshAllData);
 
-  // Load data when user changes
+  // Load data when user changes - with proper error handling
   useEffect(() => {
-    if (!authLoading && user && user.id) {
-      console.log("DataContext: User authenticated, loading optimized data for:", user.email);
-      loadAllData().catch(error => {
-        console.error("DataContext: Error loading data:", error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load data. Please refresh the page.',
-          variant: 'destructive'
-        });
-      });
-    } else if (!authLoading && !user) {
-      console.log("DataContext: No authenticated user, clearing all data");
-      setPgs([]);
-      setRooms([]);
-      setStudents([]);
-      setUsers([]);
-    }
+    const loadData = async () => {
+      if (!authLoading && user && user.id && typeof loadAllData === 'function') {
+        console.log("DataContext: User authenticated, loading data for:", user.email);
+        try {
+          await loadAllData();
+        } catch (error) {
+          console.error("DataContext: Error loading data:", error);
+          toast({
+            title: 'Error',
+            description: 'Failed to load data. Please refresh the page.',
+            variant: 'destructive'
+          });
+        }
+      } else if (!authLoading && !user) {
+        console.log("DataContext: No authenticated user, clearing all data");
+        if (typeof setPgs === 'function') setPgs([]);
+        if (typeof setRooms === 'function') setRooms([]);
+        if (typeof setStudents === 'function') setStudents([]);
+        if (typeof setUsers === 'function') setUsers([]);
+      }
+    };
+
+    loadData();
   }, [user?.id, authLoading, loadAllData, setPgs, setRooms, setStudents, setUsers, toast]);
 
-  // Create the context value
+  // Create the context value with safe fallbacks
   const value: DataContextType = {
-    pgs,
-    rooms,
-    students,
-    users,
+    pgs: pgs || [],
+    rooms: rooms || [],
+    students: students || [],
+    users: users || [],
     isLoading: isLoading || authLoading,
     ...pgOperations,
     ...roomOperations,
     ...studentOperations,
     ...paymentOperations,
     getRoomStatus,
-    refreshAllData
+    refreshAllData: refreshAllData || (() => Promise.resolve())
   };
 
-  console.log("DataContext: Providing optimized data - PGs:", pgs.length, "Rooms:", rooms.length, "Students:", students.length, "Users:", users.length, "Auth loading:", authLoading, "Data loading:", isLoading);
+  console.log("DataContext: Providing data - PGs:", (pgs || []).length, "Rooms:", (rooms || []).length, "Students:", (students || []).length, "Users:", (users || []).length, "Auth loading:", authLoading, "Data loading:", isLoading);
 
   return (
     <DataContext.Provider value={value}>
