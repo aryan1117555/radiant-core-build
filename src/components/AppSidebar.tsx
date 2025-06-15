@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboardIcon, UsersIcon, CreditCardIcon, BarChart2Icon, SettingsIcon, LogOutIcon, BuildingIcon, DoorOpenIcon, UserIcon, DatabaseIcon, MenuIcon, ChevronLeftIcon } from 'lucide-react';
@@ -8,15 +7,18 @@ import { SessionService } from '@/services/sessionService';
 import { Button } from './ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
-
 const AppSidebar = () => {
   const location = useLocation();
   const pathname = location.pathname;
-  const { user, signOut } = useAuth();
-  const { toast } = useToast();
+  const {
+    user,
+    signOut
+  } = useAuth();
+  const {
+    toast
+  } = useToast();
   const isMobile = useIsMobile();
   const [isCollapsed, setIsCollapsed] = useState(isMobile);
-
   useEffect(() => {
     setIsCollapsed(isMobile);
   }, [isMobile]);
@@ -110,10 +112,9 @@ const AppSidebar = () => {
 
       // Invalidate session first
       await SessionService.invalidateSession();
-      
+
       // Then sign out from auth
       await signOut();
-
       toast({
         title: "Logged Out",
         description: "You have been successfully logged out from all devices."
@@ -127,19 +128,13 @@ const AppSidebar = () => {
       });
     }
   };
-
-  return (
-    <aside className={cn("h-screen fixed left-0 top-0 z-40 bg-sidebar flex flex-col transition-all duration-300 ease-in-out", isCollapsed ? "w-[70px]" : "w-[280px]")}>
+  return <aside className={cn("h-screen fixed left-0 top-0 z-40 bg-sidebar flex flex-col transition-all duration-300 ease-in-out", isCollapsed ? "w-[70px]" : "w-[280px]")}>
       <div className="flex justify-between items-center h-16 px-3">
-        {!isCollapsed ? (
-          <div className="flex items-center justify-center">
-            <img src="https://restayindia.com/wp-content/uploads/2024/12/Screenshot-2024-12-23-163218-Edited-1.png" alt="Restay Logo" className="h-10 object-contain" />
-          </div>
-        ) : (
-          <div className="w-full flex justify-center">
+        {!isCollapsed ? <div className="flex items-center justify-center">
+            
+          </div> : <div className="w-full flex justify-center">
             <img alt="Restay Logo" className="h-8 w-8 object-cover" src="/lovable-uploads/6d16a901-933b-4031-a176-fe846af5da1a.png" />
-          </div>
-        )}
+          </div>}
         
         <Button variant="ghost" size="icon" onClick={() => setIsCollapsed(!isCollapsed)} className="text-white hover:bg-white/10">
           {isCollapsed ? <MenuIcon size={20} /> : <ChevronLeftIcon size={20} />}
@@ -148,27 +143,23 @@ const AppSidebar = () => {
       
       <div className="flex-1 overflow-y-auto py-4 px-2">
         <ul className="space-y-1">
-          {filteredMenuItems.map(item => (
-            <li key={item.name}>
+          {filteredMenuItems.map(item => <li key={item.name}>
               <Link to={item.href} className={cn("flex items-center gap-3 px-3 py-2 rounded-md text-white hover:bg-white/10 transition-colors", pathname === item.href && "bg-white/20", isCollapsed && "justify-center px-2")} title={isCollapsed ? item.name : ''} onClick={handleMenuItemClick}>
                 <item.icon size={20} />
                 {!isCollapsed && <span className="font-medium">{item.name}</span>}
               </Link>
-            </li>
-          ))}
+            </li>)}
         </ul>
       </div>
       
       <div className="p-3 border-t border-white/10">
-        {user && (
-          <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")}>
+        {user && <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")}>
             <div className="h-8 w-8 rounded-full bg-[#00A2F3] border-2 border-white flex items-center justify-center text-white">
               <span className="text-xs font-medium">
                 {user.name?.split(' ').map(n => n[0]).join('') || 'A'}
               </span>
             </div>
-            {!isCollapsed && (
-              <div className="flex-1">
+            {!isCollapsed && <div className="flex-1">
                 <p className="text-sm font-medium truncate text-white">{user.name || 'Admin User'}</p>
                 <p className="text-xs truncate text-zinc-50">{user.email || 'admin@restay.com'}</p>
                 <p className="text-xs text-zinc-400 capitalize">
@@ -176,16 +167,12 @@ const AppSidebar = () => {
                     {user.role || 'admin'}
                   </span>
                 </p>
-              </div>
-            )}
+              </div>}
             <Button variant="ghost" size="icon" onClick={handleLogout} className={cn("h-8 w-8 text-white hover:bg-white/10", isCollapsed && "ml-0")} title="Logout">
               <LogOutIcon className="h-4 w-4" />
             </Button>
-          </div>
-        )}
+          </div>}
       </div>
-    </aside>
-  );
+    </aside>;
 };
-
 export default AppSidebar;
