@@ -133,7 +133,7 @@ const AppSidebar = () => {
         {!isCollapsed ? <div className="flex items-center justify-center">
             
           </div> : <div className="w-full flex justify-center">
-            <img alt="Restay Logo" className="h-8 w-8 object-cover" src="/lovable-uploads/6d16a901-933b-4031-a176-fe846af5da1a.png" />
+            
           </div>}
         
         <Button variant="ghost" size="icon" onClick={() => setIsCollapsed(!isCollapsed)} className="text-white hover:bg-white/10">
