@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { SessionService } from '@/services/sessionService';
 
 // Extended User interface with custom properties
 export interface User extends SupabaseUser {
@@ -133,12 +134,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const enhancedUser = await enhanceUserWithMetadata(session.user);
           setUser(enhancedUser);
           console.log('AuthProvider: User authenticated:', enhancedUser.email);
+          
+          // Initialize session management
+          setTimeout(() => {
+            SessionService.initializeSession().catch(error => {
+              console.error('AuthProvider: Failed to initialize session:', error);
+            });
+          }, 0);
         } catch (enhanceError) {
           console.error('AuthProvider: Error enhancing user:', enhanceError);
           setUser(null);
         }
       } else {
         setUser(null);
+        // Clear any existing session cookies
+        SessionService.invalidateSession().catch(() => {
+          // Ignore errors during cleanup
+        });
       }
       
       setLoading(false);
@@ -160,12 +172,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 .from('users')
                 .update({ lastLogin: new Date().toISOString() })
                 .eq('id', session.user.id);
+                
+              // Create session on sign in
+              setTimeout(() => {
+                SessionService.createSession(session.user.id).catch(error => {
+                  console.error('AuthProvider: Failed to create session:', error);
+                });
+              }, 0);
             } catch (updateError) {
               console.warn('AuthProvider: Failed to update lastLogin:', updateError);
             }
           }
         } else {
           setUser(null);
+          // Clean up sessions on sign out
+          if (event === 'SIGNED_OUT') {
+            SessionService.invalidateSession().catch(() => {
+              // Ignore errors during cleanup
+            });
+          }
         }
       } catch (error) {
         console.error('AuthProvider: Error in auth state change:', error);
@@ -216,6 +241,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('AuthProvider: Signing out');
     
     try {
+      // First invalidate all sessions
+      if (user) {
+        await SessionService.invalidateAllUserSessions(user.id);
+      }
+      
+      // Then sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('AuthProvider: Sign out error:', error);

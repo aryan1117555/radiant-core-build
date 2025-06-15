@@ -8,22 +8,50 @@ export const useSessionManager = () => {
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [userSessions, setUserSessions] = useState<Session[]>([]);
   const [isValidating, setIsValidating] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Initialize session on first load
+  const initializeSession = useCallback(async () => {
+    if (!user || isInitialized) return;
+    
+    console.log('useSessionManager: Initializing session for user:', user.id);
+    setIsValidating(true);
+    
+    try {
+      const session = await SessionService.initializeSession();
+      setCurrentSession(session);
+      setIsInitialized(true);
+      
+      if (session) {
+        await loadUserSessions();
+      }
+    } catch (error) {
+      console.error('useSessionManager: Error initializing session:', error);
+      setCurrentSession(null);
+    } finally {
+      setIsValidating(false);
+    }
+  }, [user, isInitialized]);
 
   // Validate current session
   const validateCurrentSession = useCallback(async () => {
-    if (!user) return;
+    if (!user || !isInitialized) return;
     
     setIsValidating(true);
     try {
       const session = await SessionService.validateSession();
       setCurrentSession(session);
+      
+      if (!session) {
+        console.log('useSessionManager: Session validation failed, user may need to re-authenticate');
+      }
     } catch (error) {
-      console.error('Error validating session:', error);
+      console.error('useSessionManager: Error validating session:', error);
       setCurrentSession(null);
     } finally {
       setIsValidating(false);
     }
-  }, [user]);
+  }, [user, isInitialized]);
 
   // Load user sessions
   const loadUserSessions = useCallback(async () => {
@@ -33,7 +61,8 @@ export const useSessionManager = () => {
       const sessions = await SessionService.getUserSessions(user.id);
       setUserSessions(sessions);
     } catch (error) {
-      console.error('Error loading user sessions:', error);
+      console.error('useSessionManager: Error loading user sessions:', error);
+      setUserSessions([]);
     }
   }, [user]);
 
@@ -44,10 +73,11 @@ export const useSessionManager = () => {
     try {
       const session = await SessionService.createSession(user.id);
       setCurrentSession(session);
+      setIsInitialized(true);
       await loadUserSessions();
       return session;
     } catch (error) {
-      console.error('Error creating session:', error);
+      console.error('useSessionManager: Error creating session:', error);
       return null;
     }
   }, [user, loadUserSessions]);
@@ -59,7 +89,7 @@ export const useSessionManager = () => {
       setCurrentSession(null);
       await loadUserSessions();
     } catch (error) {
-      console.error('Error invalidating session:', error);
+      console.error('useSessionManager: Error invalidating session:', error);
     }
   }, [loadUserSessions]);
 
@@ -72,7 +102,7 @@ export const useSessionManager = () => {
       setCurrentSession(null);
       setUserSessions([]);
     } catch (error) {
-      console.error('Error invalidating all sessions:', error);
+      console.error('useSessionManager: Error invalidating all sessions:', error);
     }
   }, [user]);
 
@@ -82,31 +112,31 @@ export const useSessionManager = () => {
       await SessionService.invalidateSession(sessionToken);
       await loadUserSessions();
     } catch (error) {
-      console.error('Error invalidating specific session:', error);
+      console.error('useSessionManager: Error invalidating specific session:', error);
     }
   }, [loadUserSessions]);
 
-  // Auto-validate session on component mount and user change
+  // Initialize session when user changes
   useEffect(() => {
     if (user) {
-      validateCurrentSession();
-      loadUserSessions();
+      initializeSession();
     } else {
       setCurrentSession(null);
       setUserSessions([]);
+      setIsInitialized(false);
     }
-  }, [user, validateCurrentSession, loadUserSessions]);
+  }, [user, initializeSession]);
 
   // Set up periodic session validation (every 5 minutes)
   useEffect(() => {
-    if (!user) return;
+    if (!user || !isInitialized) return;
 
     const interval = setInterval(() => {
       validateCurrentSession();
     }, 5 * 60 * 1000); // 5 minutes
 
     return () => clearInterval(interval);
-  }, [user, validateCurrentSession]);
+  }, [user, isInitialized, validateCurrentSession]);
 
   // Clean up expired sessions periodically (every hour)
   useEffect(() => {
@@ -121,6 +151,7 @@ export const useSessionManager = () => {
     currentSession,
     userSessions,
     isValidating,
+    isInitialized,
     createSession,
     validateCurrentSession,
     invalidateCurrentSession,

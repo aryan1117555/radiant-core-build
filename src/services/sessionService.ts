@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Session {
@@ -94,6 +95,7 @@ export class SessionService {
     return this.retryOperation(async () => {
       const sessionToken = this.getSessionCookie();
       if (!sessionToken) {
+        console.log('SessionService: No session token found in cookies');
         return null;
       }
 
@@ -106,13 +108,19 @@ export class SessionService {
         .single();
 
       if (error || !data) {
-        // Invalid or expired session
+        console.log('SessionService: Invalid or expired session, clearing cookie');
         this.clearSessionCookie();
         return null;
       }
 
-      // Extend session if it's valid
-      await this.extendSession(data.id);
+      // Extend session if it's valid and close to expiry (within 1 hour)
+      const expiresAt = new Date(data.expires_at);
+      const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
+      
+      if (expiresAt < oneHourFromNow) {
+        await this.extendSession(data.id);
+      }
+
       return {
         ...data,
         ip_address: data.ip_address as string | null
@@ -143,6 +151,7 @@ export class SessionService {
         this.setSessionCookie(sessionToken, newExpiresAt);
       }
       
+      console.log('SessionService: Session extended successfully');
       return true;
     }, 'extendSession');
   }
@@ -151,7 +160,10 @@ export class SessionService {
   static async invalidateSession(sessionToken?: string): Promise<void> {
     await this.retryOperation(async () => {
       const token = sessionToken || this.getSessionCookie();
-      if (!token) return true;
+      if (!token) {
+        console.log('SessionService: No session token to invalidate');
+        return true;
+      }
 
       const { error } = await supabase
         .from('sessions')
@@ -162,7 +174,11 @@ export class SessionService {
         throw error;
       }
 
-      this.clearSessionCookie();
+      // Only clear cookie if we're invalidating current session
+      if (!sessionToken) {
+        this.clearSessionCookie();
+      }
+      
       console.log('SessionService: Session invalidated');
       return true;
     }, 'invalidateSession');
@@ -209,11 +225,13 @@ export class SessionService {
     }
   }
 
-  // Cookie management methods
+  // Improved cookie management methods with better error handling
   private static setSessionCookie(token: string, expiresAt: string): void {
     try {
       const expires = new Date(expiresAt);
-      document.cookie = `${this.COOKIE_NAME}=${token}; expires=${expires.toUTCString()}; path=/; secure; samesite=strict`;
+      const cookieString = `${this.COOKIE_NAME}=${token}; expires=${expires.toUTCString()}; path=/; secure; samesite=strict`;
+      document.cookie = cookieString;
+      console.log('SessionService: Session cookie set successfully');
     } catch (error) {
       console.error('SessionService: Failed to set session cookie:', error);
     }
@@ -221,11 +239,14 @@ export class SessionService {
 
   private static getSessionCookie(): string | null {
     try {
-      const cookies = document.cookie.split(';');
+      const name = this.COOKIE_NAME + "=";
+      const decodedCookie = decodeURIComponent(document.cookie);
+      const cookies = decodedCookie.split(';');
+      
       for (let cookie of cookies) {
-        const [name, value] = cookie.trim().split('=');
-        if (name === this.COOKIE_NAME) {
-          return value;
+        cookie = cookie.trim();
+        if (cookie.indexOf(name) === 0) {
+          return cookie.substring(name.length, cookie.length);
         }
       }
     } catch (error) {
@@ -236,7 +257,8 @@ export class SessionService {
 
   private static clearSessionCookie(): void {
     try {
-      document.cookie = `${this.COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      document.cookie = `${this.COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure; samesite=strict`;
+      console.log('SessionService: Session cookie cleared successfully');
     } catch (error) {
       console.error('SessionService: Failed to clear session cookie:', error);
     }
@@ -253,6 +275,34 @@ export class SessionService {
       }
     } catch (error) {
       console.error('Error in cleanupExpiredSessions:', error);
+    }
+  }
+
+  // Initialize session on app start
+  static async initializeSession(): Promise<Session | null> {
+    try {
+      // First, check if we have a valid Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        console.log('SessionService: No Supabase session found');
+        this.clearSessionCookie();
+        return null;
+      }
+
+      // Then validate our custom session
+      const customSession = await this.validateSession();
+      
+      if (!customSession) {
+        // Create a new session if none exists
+        console.log('SessionService: Creating new session for user');
+        return await this.createSession(session.user.id);
+      }
+
+      return customSession;
+    } catch (error) {
+      console.error('SessionService: Error initializing session:', error);
+      return null;
     }
   }
 }
