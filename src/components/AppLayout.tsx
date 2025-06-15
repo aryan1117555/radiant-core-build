@@ -17,24 +17,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
         isMobile ? 'ml-[70px]' : 'ml-[70px] lg:ml-[280px]'
       } w-full`}>
-        {/* Professional header */}
-        <header className="h-16 border-b border-border/20 flex items-center justify-between px-4 lg:px-8 w-full glass-effect">
-          <div className="flex items-center gap-4">
-            <div className="hidden lg:block">
-              <h1 className="text-lg font-semibold text-foreground">ReStay Management</h1>
-            </div>
-          </div>
+        <div className="h-16 border-b border-border/50 flex items-center justify-between px-3 sm:px-4 md:px-6 w-full bg-card/50 backdrop-blur-sm">
+          <div className="md:hidden"></div>
           <UserMenu />
-        </header>
-        
-        {/* Main content area */}
-        <main className="flex-1 overflow-y-auto w-full bg-gradient-to-br from-background via-background/95 to-background">
-          <div className="w-full max-w-none p-4 lg:p-8 min-h-full">
-            <div className="animate-fade-in">
-              {children}
-            </div>
+        </div>
+        <div className="flex-1 overflow-y-auto w-full">
+          <div className="w-full max-w-none p-3 sm:p-4 md:p-6 lg:p-8 xl:p-12 min-h-full">
+            {children}
           </div>
-        </main>
+        </div>
       </div>
     </div>
   );
