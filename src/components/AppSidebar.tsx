@@ -1,21 +1,22 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboardIcon, UsersIcon, CreditCardIcon, BarChart2Icon, SettingsIcon, LogOutIcon, BuildingIcon, DoorOpenIcon, UserIcon, DatabaseIcon, MenuIcon, ChevronLeftIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
-import { SessionService } from '@/services/sessionService';
 import { Button } from './ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
 
 const AppSidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const pathname = location.pathname;
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [isCollapsed, setIsCollapsed] = useState(isMobile);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     setIsCollapsed(isMobile);
@@ -107,28 +108,48 @@ const AppSidebar = () => {
     }
   };
 
-  // Enhanced logout with session invalidation
+  // Enhanced logout with proper error handling
   const handleLogout = async () => {
+    if (isLoggingOut) return;
+    
+    setIsLoggingOut(true);
+    
     try {
+      console.log('AppSidebar: Starting logout process...');
+      
+      // Show initial toast
       toast({
-        title: "Logging Out",
-        description: "Please wait while we log you out..."
+        title: "Logging out...",
+        description: "Please wait while we sign you out."
       });
 
-      await SessionService.invalidateSession();
+      // Sign out using the auth context
       await signOut();
       
+      // Navigate to login page
+      navigate('/login', { replace: true });
+      
+      // Show success toast
       toast({
-        title: "Logged Out",
-        description: "You have been successfully logged out from all devices."
+        title: "Logged out successfully",
+        description: "You have been signed out from all devices."
       });
+      
+      console.log('AppSidebar: Logout successful');
     } catch (error) {
-      console.error('Error during logout:', error);
+      console.error('AppSidebar: Logout error:', error);
+      
+      // Show error toast
       toast({
-        title: "Logout Error",
-        description: "There was an issue logging out. Please try again.",
+        title: "Logout failed",
+        description: "There was an issue signing out. Please try again.",
         variant: "destructive"
       });
+      
+      // Force navigation to login even on error
+      navigate('/login', { replace: true });
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
@@ -220,10 +241,11 @@ const AppSidebar = () => {
               variant="ghost" 
               size="icon" 
               onClick={handleLogout} 
-              className="h-8 w-8 text-white hover:bg-white/10 flex-shrink-0" 
+              disabled={isLoggingOut}
+              className="h-8 w-8 text-white hover:bg-white/10 flex-shrink-0 disabled:opacity-50" 
               title="Logout"
             >
-              <LogOutIcon className="h-4 w-4" />
+              <LogOutIcon className={cn("h-4 w-4", isLoggingOut && "animate-spin")} />
             </Button>
           </div>
         )}
