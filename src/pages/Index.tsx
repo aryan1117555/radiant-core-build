@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '@/context/DataContext';
 import { useAuth } from '@/context/AuthContext';
@@ -20,18 +21,21 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { Skeleton } from '@/components/ui/skeleton';
 import AddRoomDialog from '@/components/AddRoomDialog';
 import RoomDetailsModal from '@/components/RoomDetailsModal';
 import DashboardStats from '@/components/dashboard/DashboardStats';
 import DashboardCharts from '@/components/DashboardCharts';
 import RecentActivityFeed from '@/components/RecentActivityFeed';
 import DashboardCalendar from '@/components/DashboardCalendar';
+import ApiLoadMonitor from '@/components/ApiLoadMonitor';
 
 const Index = () => {
   const { 
     rooms, 
     pgs,
     students,
+    isLoading,
     getRoomStatus, 
     addStudent, 
     removeStudent, 
@@ -178,6 +182,66 @@ const Index = () => {
     };
   }, [rooms, students, selectedPG, dateRange]);
 
+  // Loading skeleton component
+  const LoadingSkeleton = () => (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-6">
+              <Skeleton className="h-4 w-20 mb-2" />
+              <Skeleton className="h-8 w-16 mb-1" />
+              <Skeleton className="h-3 w-24" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card>
+            <CardContent className="p-6">
+              <Skeleton className="h-6 w-32 mb-4" />
+              <Skeleton className="h-64 w-full" />
+            </CardContent>
+          </Card>
+        </div>
+        <div>
+          <Card>
+            <CardContent className="p-6">
+              <Skeleton className="h-6 w-28 mb-4" />
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex items-center space-x-3">
+                    <Skeleton className="h-8 w-8 rounded-full" />
+                    <div className="space-y-1">
+                      <Skeleton className="h-3 w-24" />
+                      <Skeleton className="h-2 w-16" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (isLoading) {
+    return (
+      <div className="mb-6 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <Skeleton className="h-8 w-64" />
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-40" />
+            <Skeleton className="h-10 w-60" />
+          </div>
+        </div>
+        <LoadingSkeleton />
+      </div>
+    );
+  }
+
   return (
     <>
       {/* Header Section */}
@@ -290,7 +354,7 @@ const Index = () => {
             {/* KPI Summary Cards */}
             <DashboardStats stats={dashboardStats} />
             
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               {/* Analytics Charts Section */}
               <div className="lg:col-span-2 space-y-6">
                 <DashboardCharts />
@@ -299,7 +363,11 @@ const Index = () => {
               {/* Recent Activity Feed */}
               <div className="space-y-6">
                 <RecentActivityFeed />
-                
+              </div>
+
+              {/* API Performance Monitor */}
+              <div className="space-y-6">
+                <ApiLoadMonitor />
               </div>
             </div>
           </TabsContent>

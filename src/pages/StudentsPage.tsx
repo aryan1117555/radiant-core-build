@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useData } from '@/context/DataContext';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import PageTabs from '@/components/PageTabs';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -17,6 +17,7 @@ const StudentsPage = () => {
   const {
     pgs,
     rooms: contextRooms,
+    isLoading: contextLoading,
     clearAllStudents
   } = useData();
   
@@ -270,6 +271,53 @@ const StudentsPage = () => {
     return format(new Date(date), 'dd/MM/yyyy');
   }, []);
 
+  // Loading skeleton for students
+  const StudentsLoadingSkeleton = () => (
+    <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="block lg:hidden divide-y divide-gray-200">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="p-4 bg-slate-950">
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <Skeleton className="h-5 w-32 mb-2" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+              <Skeleton className="h-6 w-16 rounded-full" />
+            </div>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-8 w-8" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden lg:block">
+        <div className="bg-muted p-4">
+          <div className="flex gap-4">
+            {[...Array(9)].map((_, i) => (
+              <Skeleton key={i} className="h-4 w-24" />
+            ))}
+          </div>
+        </div>
+        <div className="divide-y">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="p-4 bg-slate-950 flex gap-4">
+              {[...Array(9)].map((_, j) => (
+                <Skeleton key={j} className="h-4 w-24" />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   // Optimized student card component
   const StudentCard = React.memo(({ student, onView, onDelete }: { 
     student: any, 
@@ -351,12 +399,8 @@ const StudentsPage = () => {
 
   // Optimized tab content rendering
   const renderTabContent = useCallback(() => {
-    if (loading && initialLoad) {
-      return (
-        <div className="rounded-lg shadow p-4 sm:p-6 text-center bg-slate-950">
-          <p className="text-muted-foreground">Loading students...</p>
-        </div>
-      );
+    if ((loading && initialLoad) || contextLoading) {
+      return <StudentsLoadingSkeleton />;
     }
 
     if (user?.role === 'manager' && students.length === 0 && !loading) {
@@ -458,7 +502,7 @@ const StudentsPage = () => {
         </div>
       </div>
     );
-  }, [loading, initialLoad, user, students, filteredStudents, hasDeletePermission, handleViewStudent, handleDeleteStudent]);
+  }, [loading, initialLoad, contextLoading, user, students, filteredStudents, hasDeletePermission, handleViewStudent, handleDeleteStudent]);
 
   return (
     <div className="w-full">

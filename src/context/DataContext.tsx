@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { DataContextType } from './types/DataContextTypes';
-import { useDataLoader } from './hooks/useDataLoader';
+import { useOptimizedDataLoader } from './hooks/useOptimizedDataLoader';
 import { usePGOperations } from './hooks/usePGOperations';
 import { useRoomOperations } from './hooks/useRoomOperations';
 import { useStudentOperations } from './hooks/useStudentOperations';
@@ -30,7 +30,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
   console.log("DataContext: Current user:", user?.email, user?.user_metadata?.role, user?.user_metadata?.assignedPGs);
 
-  // Use the unified data loader hook
+  // Use the optimized data loader hook instead of the old one
   const {
     pgs,
     rooms,
@@ -43,7 +43,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     setRooms,
     setStudents,
     setUsers
-  } = useDataLoader(user);
+  } = useOptimizedDataLoader(user);
 
   // Use unified operation hooks with proper refresh callbacks
   const pgOperations = usePGOperations(refreshAllData);
@@ -54,7 +54,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   // Load data when user changes
   useEffect(() => {
     if (!authLoading && user && user.id) {
-      console.log("DataContext: User authenticated, loading data for:", user.email);
+      console.log("DataContext: User authenticated, loading optimized data for:", user.email);
       loadAllData().catch(error => {
         console.error("DataContext: Error loading data:", error);
         toast({
@@ -87,7 +87,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     refreshAllData
   };
 
-  console.log("DataContext: Providing data - PGs:", pgs.length, "Rooms:", rooms.length, "Students:", students.length, "Users:", users.length, "Auth loading:", authLoading, "Data loading:", isLoading);
+  console.log("DataContext: Providing optimized data - PGs:", pgs.length, "Rooms:", rooms.length, "Students:", students.length, "Users:", users.length, "Auth loading:", authLoading, "Data loading:", isLoading);
 
   return (
     <DataContext.Provider value={value}>
