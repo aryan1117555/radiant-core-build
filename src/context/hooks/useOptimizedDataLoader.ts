@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { PG, Room, Student, User } from '@/types';
 import { fetchPGs } from '@/services/pg';
@@ -16,7 +15,10 @@ export const useOptimizedDataLoader = (user: any) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<null | Error>(null);
   const lastLoadTime = useRef<number>(0);
+  const loadToken = useRef<number>(0);
   const { makeRequest } = useOptimizedApi();
 
   // Cache minimum interval between full data loads (5 seconds)
@@ -74,7 +76,7 @@ export const useOptimizedDataLoader = (user: any) => {
   }, [makeRequest, user?.role]);
 
   // Debounced full data load function
-  const loadAllData = useDebouncedCallback(async () => {
+  const loadAllData = useDebouncedCallback(async (isRefresh = false) => {
     if (!user || !user.id) {
       console.log("OptimizedDataLoader: No user or user ID, skipping data load");
       return;
@@ -82,17 +84,22 @@ export const useOptimizedDataLoader = (user: any) => {
 
     // Prevent too frequent loads
     const now = Date.now();
-    if (now - lastLoadTime.current < MIN_LOAD_INTERVAL) {
+    if (now - lastLoadTime.current < MIN_LOAD_INTERVAL && !isRefresh) {
       console.log("OptimizedDataLoader: Load requested too soon, skipping");
       return;
     }
 
-    try {
+    const thisToken = ++loadToken.current;
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
       setIsLoading(true);
-      lastLoadTime.current = now;
-      
+    }
+    setError(null);
+    lastLoadTime.current = now;
+
+    try {
       console.log("OptimizedDataLoader: Loading optimized data for user:", user?.email, user?.role);
-      
       // Load data in parallel with priorities
       const [pgsData, roomsData, studentsData, usersData] = await Promise.all([
         loadPGsOptimized(),
@@ -100,14 +107,18 @@ export const useOptimizedDataLoader = (user: any) => {
         loadStudentsOptimized(),
         loadUsersOptimized()
       ]);
-      
-      console.log("OptimizedDataLoader: Raw data loaded - PGs:", pgsData.length, "Rooms:", roomsData.length, "Students:", studentsData.length);
-      
+
+      // Only update state if this is the latest load
+      if (loadToken.current !== thisToken) {
+        console.log("OptimizedDataLoader: Outdated load, skipping state update");
+        return;
+      }
+
       // Transform and enhance data
       const transformedRooms = roomsData.map(transformRoomFromDB);
       const enhancedStudents = enhanceStudentsWithRoomInfo(studentsData, transformedRooms, pgsData);
       const roomsWithStudents = populateStudentsIntoRooms(transformedRooms, enhancedStudents);
-      
+
       // Apply role-based filtering
       const { filteredPGs, filteredRooms, filteredStudents } = filterDataByUserRole(
         pgsData, 
@@ -115,24 +126,23 @@ export const useOptimizedDataLoader = (user: any) => {
         enhancedStudents, 
         user
       );
-      
-      console.log("OptimizedDataLoader: After optimization - PGs:", filteredPGs.length, "Rooms:", filteredRooms.length, "Students:", filteredStudents.length);
-      
+
       // Batch state updates
-      stableSetters.setPgs(filteredPGs);
-      stableSetters.setRooms(filteredRooms);
-      stableSetters.setStudents(filteredStudents);
-      stableSetters.setUsers(usersData);
-      
-    } catch (error) {
+      setPgs(filteredPGs);
+      setRooms(filteredRooms);
+      setStudents(filteredStudents);
+      setUsers(usersData);
+    } catch (error: any) {
+      if (loadToken.current === thisToken) {
+        setError(error);
+        // Do not clear data arrays here to prevent flicker
+      }
       console.error('OptimizedDataLoader: Error loading data:', error);
-      // Clear data on error
-      stableSetters.setPgs([]);
-      stableSetters.setRooms([]);
-      stableSetters.setStudents([]);
-      stableSetters.setUsers([]);
     } finally {
-      setIsLoading(false);
+      if (loadToken.current === thisToken) {
+        setIsLoading(false);
+        setRefreshing(false);
+      }
     }
   }, 500); // 500ms debounce
 
@@ -140,7 +150,7 @@ export const useOptimizedDataLoader = (user: any) => {
   const refreshAllData = useCallback(async () => {
     console.log("OptimizedDataLoader: Refreshing all data...");
     lastLoadTime.current = 0; // Reset to allow immediate load
-    await loadAllData();
+    await loadAllData(true); // Pass isRefresh=true
     console.log("OptimizedDataLoader: All data refreshed successfully");
   }, [loadAllData]);
 
@@ -150,6 +160,8 @@ export const useOptimizedDataLoader = (user: any) => {
     students,
     users,
     isLoading,
+    refreshing,
+    error,
     loadAllData,
     refreshAllData,
     setPgs: stableSetters.setPgs,
