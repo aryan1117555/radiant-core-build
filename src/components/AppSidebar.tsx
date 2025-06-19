@@ -161,7 +161,7 @@ const AppSidebar = () => {
       <div className="flex justify-between items-center h-16 px-3 border-b border-white/10">
         {!isCollapsed && !isMobile && (
           <div className="flex items-center justify-center">
-            <h1 className="text-lg font-bold text-white">ReStay</h1>
+            <h1 className="text-lg font-bold text-white"></h1>
           </div>
         )}
         
